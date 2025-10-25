@@ -22,6 +22,9 @@ COPY . .
 # Create directories for stacks and data
 RUN mkdir -p /stacks /app/data /app/logs
 
+# Create placeholder images for blueprints
+RUN python3 create_placeholders.py || echo "Warning: Could not create placeholder images"
+
 # Expose port
 EXPOSE 2112
 

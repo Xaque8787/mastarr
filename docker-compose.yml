@@ -11,8 +11,6 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-mastarr}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - mastarr_internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mastarr}"]
       interval: 10s
@@ -42,18 +40,9 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-mastarr}
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
-    networks:
-      - mastarr_net
-      - mastarr_internal
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   postgres_data:
-
-networks:
-  mastarr_net:
-    external: true
-  mastarr_internal:
-    driver: bridge
