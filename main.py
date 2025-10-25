@@ -22,11 +22,11 @@ async def lifespan(app: FastAPI):
     logger.info("Mastarr Starting...")
     logger.info("=" * 60)
 
-    initializer = FirstRunInitializer()
-    initializer.initialize()
-
     logger.info("Initializing database...")
     init_db()
+
+    initializer = FirstRunInitializer()
+    initializer.initialize()
 
     logger.info("Initializing system hooks...")
     initialize_system_hooks()
