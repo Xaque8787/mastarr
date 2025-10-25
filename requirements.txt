@@ -29,8 +29,5 @@ python-dotenv==1.0.1
 # Logging
 rich==13.9.2
 
-# Supabase client (optional, if using their client library)
-supabase==2.9.0
-
 # Date/time utilities
 python-dateutil==2.9.0

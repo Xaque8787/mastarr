@@ -4,7 +4,7 @@ Mastarr is a Python-based application manager for Docker containers, specificall
 
 ## Features
 
-- **Database-Driven**: Uses Supabase PostgreSQL for storing app configurations and blueprints
+- **Database-Driven**: Uses PostgreSQL for storing app configurations and blueprints
 - **Dynamic Compose Generation**: Generates Docker Compose files on-the-fly from validated Pydantic models
 - **Dependency Management**: Automatically resolves installation order based on app dependencies
 - **System Hooks**: First-run and lifecycle hooks for network setup and system initialization
@@ -31,18 +31,20 @@ mastarr/
 ### Prerequisites
 
 - Docker and Docker Compose installed
-- Supabase project with database access
 
 ### Setup
 
-1. **Update Environment Variables**
+1. **Update Environment Variables** (Optional)
 
-Edit `.env` file with your Supabase credentials:
+The `.env` file contains default PostgreSQL credentials. You can customize them:
 
 ```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_SUPABASE_ANON_KEY=your-anon-key
+POSTGRES_USER=mastarr
+POSTGRES_PASSWORD=mastarr_secure_password
+POSTGRES_DB=mastarr
 ```
+
+**Important**: Change the default password for production use!
 
 2. **Build and Start**
 
@@ -58,7 +60,7 @@ docker exec -it mastarr python load_blueprints.py
 
 4. **Access the UI**
 
-Open your browser to: `http://localhost:8000`
+Open your browser to: `http://localhost:2112`
 
 ## How It Works
 

@@ -116,18 +116,20 @@ class GlobalSettings(Base):
 # Database connection
 def get_database_url():
     """Get database URL from environment"""
-    supabase_url = os.getenv("SUPABASE_URL", "")
+    # Check for explicit DATABASE_URL first
+    db_url = os.getenv("DATABASE_URL")
 
-    if not supabase_url:
-        raise ValueError("SUPABASE_URL not set in environment")
+    if db_url:
+        return db_url
 
-    # Extract project reference from Supabase URL
-    # Format: https://<project-ref>.supabase.co
-    project_ref = supabase_url.replace("https://", "").replace(".supabase.co", "")
+    # Otherwise construct from individual components
+    postgres_user = os.getenv("POSTGRES_USER", "mastarr")
+    postgres_password = os.getenv("POSTGRES_PASSWORD", "mastarr_secure_password")
+    postgres_host = os.getenv("POSTGRES_HOST", "postgres")
+    postgres_port = os.getenv("POSTGRES_PORT", "5432")
+    postgres_db = os.getenv("POSTGRES_DB", "mastarr")
 
-    # Construct PostgreSQL connection string
-    # Supabase provides direct PostgreSQL access
-    db_url = f"postgresql://postgres:postgres@db.{project_ref}.supabase.co:5432/postgres"
+    db_url = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
 
     return db_url
 

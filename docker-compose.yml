@@ -1,6 +1,24 @@
 version: '3.9'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mastarr_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-mastarr}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mastarr_secure_password}
+      - POSTGRES_DB=${POSTGRES_DB:-mastarr}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mastarr_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mastarr}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mastarr:
     build:
       context: .
@@ -8,7 +26,7 @@ services:
     container_name: mastarr
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "2112:2112"
     volumes:
       - ./:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -16,13 +34,26 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     environment:
-      - SUPABASE_URL=${VITE_SUPABASE_URL}
-      - SUPABASE_KEY=${VITE_SUPABASE_SUPABASE_ANON_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mastarr}:${POSTGRES_PASSWORD:-mastarr_secure_password}@postgres:5432/${POSTGRES_DB:-mastarr}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-mastarr}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mastarr_secure_password}
+      - POSTGRES_DB=${POSTGRES_DB:-mastarr}
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO
     networks:
       - mastarr_net
+      - mastarr_internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
 
 networks:
   mastarr_net:
     external: true
+  mastarr_internal:
+    driver: bridge
