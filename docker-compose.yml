@@ -1,0 +1,28 @@
+version: '3.9'
+
+services:
+  mastarr:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mastarr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./stacks:/stacks
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - SUPABASE_URL=${VITE_SUPABASE_URL}
+      - SUPABASE_KEY=${VITE_SUPABASE_SUPABASE_ANON_KEY}
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    networks:
+      - mastarr_net
+
+networks:
+  mastarr_net:
+    external: true

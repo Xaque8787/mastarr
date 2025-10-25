@@ -1,0 +1,73 @@
+{
+  "name": "jellyfin",
+  "display_name": "Jellyfin",
+  "description": "Install Jellyfin Media Server",
+  "category": "MEDIA SERVERS",
+  "icon_url": "/static/images/jellyfin.png",
+  "install_order": 1.0,
+  "visible": true,
+  "prerequisites": [],
+  "static_ips": {
+    "jellyfin": "10.21.12.3"
+  },
+  "schema": {
+    "image": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Docker Image",
+      "default": "jellyfin/jellyfin:latest",
+      "required": false,
+      "visible": true
+    },
+    "container_name": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Container Name",
+      "default": "jellyfin",
+      "required": false,
+      "visible": true
+    },
+    "host_port": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "Host Port",
+      "default": 8096,
+      "required": false,
+      "visible": true
+    },
+    "container_port": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "Container Port",
+      "default": 8096,
+      "required": false,
+      "visible": false
+    },
+    "admin_user": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Admin Username",
+      "placeholder": "Enter a username for the Admin user",
+      "required": true,
+      "visible": true
+    },
+    "admin_password": {
+      "type": "string",
+      "ui_component": "password",
+      "label": "Admin Password",
+      "placeholder": "Enter a password for the Admin user",
+      "required": true,
+      "visible": true,
+      "is_sensitive": true
+    },
+    "enable_transcoding": {
+      "type": "boolean",
+      "ui_component": "checkbox",
+      "label": "Enable Transcoding",
+      "default": false,
+      "required": false,
+      "visible": true
+    }
+  },
+  "post_install_hook": null
+}
