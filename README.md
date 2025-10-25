@@ -52,15 +52,19 @@ POSTGRES_DB=mastarr
 docker-compose up -d --build
 ```
 
-3. **Load Blueprints**
+Blueprints are automatically loaded from the `blueprints/` directory on first startup!
+
+3. **Access the UI**
+
+Open your browser to: `http://localhost:2112`
+
+### Manual Blueprint Management
+
+To manually reload or update blueprints:
 
 ```bash
 docker exec -it mastarr python load_blueprints.py
 ```
-
-4. **Access the UI**
-
-Open your browser to: `http://localhost:2112`
 
 ## How It Works
 

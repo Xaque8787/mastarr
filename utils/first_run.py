@@ -2,6 +2,7 @@ import docker
 import os
 from pathlib import Path
 from utils.logger import get_logger
+from utils.blueprint_loader import load_blueprints_from_directory, get_blueprint_count
 
 logger = get_logger("mastarr.first_run")
 
@@ -24,6 +25,7 @@ class FirstRunInitializer:
         self._check_docker_socket()
         self._check_docker_connectivity()
         self._ensure_directories()
+        self._load_blueprints()
 
         logger.info("=" * 60)
         logger.info("First-Run Initialization Complete")
@@ -70,6 +72,36 @@ class FirstRunInitializer:
             path = Path(directory)
             path.mkdir(parents=True, exist_ok=True)
             logger.info(f"✓ Directory ensured: {directory}")
+
+    def _load_blueprints(self):
+        """Load blueprints from JSON files if database is empty"""
+        try:
+            blueprint_count = get_blueprint_count()
+
+            if blueprint_count == 0:
+                logger.info("No blueprints found in database, loading from files...")
+                loaded, errors = load_blueprints_from_directory()
+
+                if loaded > 0:
+                    logger.info(f"✓ Loaded {loaded} blueprint(s)")
+                else:
+                    logger.warning("No blueprints were loaded")
+
+                if errors > 0:
+                    logger.warning(f"{errors} blueprint(s) failed to load")
+            else:
+                logger.info(f"✓ Found {blueprint_count} blueprint(s) in database")
+
+        except Exception as e:
+            logger.error(f"Failed to load blueprints: {e}", exc_info=True)
+            logger.warning("Application will continue, but no blueprints are available")
+
+    def reload_blueprints(self):
+        """Manually reload all blueprints from files (updates existing)"""
+        logger.info("Manually reloading blueprints...")
+        loaded, errors = load_blueprints_from_directory()
+        logger.info(f"Reload complete: {loaded} loaded, {errors} errors")
+        return loaded, errors
 
     def get_system_info(self) -> dict:
         """Get system information for display"""

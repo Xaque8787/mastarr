@@ -1,72 +1,37 @@
 #!/usr/bin/env python3
 """
-Load blueprint JSON files into the database.
-Run this script to initialize blueprints from the blueprints/ directory.
+Manual blueprint loader script.
+
+NOTE: Blueprints are automatically loaded on first startup!
+This script is only needed for:
+- Manually reloading/updating blueprints
+- Forcing a reload of modified blueprint files
+- Testing blueprint changes
+
+For normal operation, blueprints load automatically when Mastarr starts.
 """
 
-import json
-from pathlib import Path
-from models.database import Blueprint, get_session, init_db
+from models.database import init_db
 from utils.logger import setup_logging
+from utils.blueprint_loader import load_blueprints_from_directory, get_blueprint_count
 
 logger = setup_logging()
 
 
-def load_blueprints_from_directory(directory: str = "blueprints"):
-    """
-    Load all JSON blueprint files from directory into database.
-
-    Args:
-        directory: Directory containing blueprint JSON files
-    """
-    blueprint_dir = Path(directory)
-
-    if not blueprint_dir.exists():
-        logger.error(f"Blueprints directory not found: {directory}")
-        return
-
-    db = get_session()
-
-    for blueprint_file in blueprint_dir.glob("*.json"):
-        try:
-            logger.info(f"Loading blueprint: {blueprint_file.name}")
-
-            with open(blueprint_file, 'r') as f:
-                data = json.load(f)
-
-            existing = db.query(Blueprint).filter(
-                Blueprint.name == data['name']
-            ).first()
-
-            if existing:
-                logger.info(f"Updating existing blueprint: {data['name']}")
-                for key, value in data.items():
-                    if key == 'schema':
-                        setattr(existing, 'schema_json', value)
-                    else:
-                        setattr(existing, key, value)
-            else:
-                logger.info(f"Creating new blueprint: {data['name']}")
-                blueprint_data = {**data}
-                blueprint_data['schema_json'] = blueprint_data.pop('schema')
-
-                blueprint = Blueprint(**blueprint_data)
-                db.add(blueprint)
-
-            db.commit()
-            logger.info(f"✓ Loaded blueprint: {data['name']}")
-
-        except Exception as e:
-            logger.error(f"Failed to load {blueprint_file.name}: {e}")
-            db.rollback()
-
-    db.close()
-    logger.info("Blueprint loading complete")
-
-
 if __name__ == "__main__":
+    logger.info("=" * 60)
+    logger.info("Manual Blueprint Loader")
+    logger.info("=" * 60)
+
     logger.info("Initializing database...")
     init_db()
 
-    logger.info("Loading blueprints from blueprints/ directory...")
-    load_blueprints_from_directory()
+    current_count = get_blueprint_count()
+    logger.info(f"Current blueprints in database: {current_count}")
+
+    logger.info("Loading/updating blueprints from blueprints/ directory...")
+    loaded, errors = load_blueprints_from_directory()
+
+    logger.info("=" * 60)
+    logger.info(f"Results: {loaded} loaded, {errors} errors")
+    logger.info("=" * 60)
