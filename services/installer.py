@@ -1,4 +1,5 @@
 import yaml
+import docker
 from datetime import datetime
 from typing import List, Dict, Set
 from pathlib import Path
@@ -6,6 +7,7 @@ from python_on_whales import DockerClient
 from models.database import App, Blueprint, get_session
 from models.schemas import ComposeSchema
 from services.compose_generator import generate_compose
+from hooks.base import HookContext, get_hook_executor
 from utils.logger import get_logger
 from utils.path_resolver import PathResolver
 
@@ -18,7 +20,9 @@ class AppInstaller:
     def __init__(self, db=None):
         self.db = db or get_session()
         self.docker = DockerClient()
+        self.docker_client = docker.from_env()
         self.path_resolver = PathResolver()
+        self.hook_executor = get_hook_executor()
 
     async def install_apps_batch(self, app_ids: List[int]):
         """
@@ -151,9 +155,8 @@ class AppInstaller:
             app.compose_data = compose_dict
             self.db.commit()
 
-            if blueprint.post_install_hook:
-                logger.info(f"Running post-install hook: {blueprint.post_install_hook}")
-                await self._run_post_install_hook(blueprint.post_install_hook, app.id)
+            # Execute post-install hook using new hooks system
+            await self._execute_app_hook(app, blueprint, "post_install")
 
             logger.info(f"✓ {app.name} installed successfully")
 
@@ -164,23 +167,60 @@ class AppInstaller:
             self.db.commit()
             raise
 
-    async def _run_post_install_hook(self, hook_name: str, app_id: int):
-        """Execute a post-install hook"""
+    async def _execute_app_hook(self, app: App, blueprint: Blueprint, hook_name: str):
+        """
+        Execute an app-specific hook using the new hooks system.
+
+        Args:
+            app: App database record
+            blueprint: Blueprint definition
+            hook_name: Name of hook to execute (post_install, pre_uninstall, etc.)
+        """
         try:
-            module_parts = hook_name.split('_')
-            if len(module_parts) > 1:
-                module_name = module_parts[1]
+            # Get container info
+            container_name = app.inputs.get('container_name', blueprint.name)
+            container_ip = None
+
+            try:
+                container = self.docker_client.containers.get(container_name)
+                networks = container.attrs.get('NetworkSettings', {}).get('Networks', {})
+
+                # Try to get IP from mastarr_net
+                if 'mastarr_net' in networks:
+                    container_ip = networks['mastarr_net'].get('IPAddress')
+
+                logger.info(f"Container {container_name} IP: {container_ip}")
+            except docker.errors.NotFound:
+                logger.warning(f"Container {container_name} not found")
+
+            # Build hook context
+            context = HookContext(
+                app_id=app.id,
+                app_name=app.name,
+                blueprint_name=blueprint.name,
+                container_name=container_name,
+                container_ip=container_ip,
+                inputs=app.inputs,
+                db=self.db,
+                docker_client=self.docker_client
+            )
+
+            # Execute hook
+            success = await self.hook_executor.execute_hook(
+                blueprint.name,
+                hook_name,
+                context
+            )
+
+            if success:
+                logger.info(f"✓ {hook_name} hook completed for {app.name}")
             else:
-                module_name = hook_name
-
-            module = __import__(f"services.{module_name}", fromlist=[hook_name])
-            hook_func = getattr(module, hook_name)
-
-            await hook_func(app_id, self.db)
-            logger.info(f"✓ Post-install hook completed: {hook_name}")
+                logger.warning(f"{hook_name} hook had issues for {app.name}")
 
         except Exception as e:
-            logger.error(f"Post-install hook failed: {hook_name}: {e}", exc_info=True)
+            logger.error(f"Failed to execute {hook_name} hook for {app.name}: {e}", exc_info=True)
+            # Don't fail the installation if hook fails
+            # The app is running, just post-config didn't complete
 
     def _get_apps(self, app_ids: List[int]) -> List[App]:
         """Fetch apps from database"""
