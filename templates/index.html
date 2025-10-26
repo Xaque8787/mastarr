@@ -323,7 +323,7 @@
                 <div x-show="installSuccess" class="success-message" x-text="installSuccess"></div>
 
                 <form @submit.prevent="installApp()">
-                    <template x-for="(field, fieldName) in selectedBlueprint?.schema" :key="fieldName">
+                    <template x-for="(field, fieldName) in (selectedBlueprint?.schema_json || selectedBlueprint?.schema)" :key="fieldName">
                         <div class="form-group" x-show="field.visible">
                             <!-- Text Input -->
                             <template x-if="field.ui_component === 'text'">
@@ -477,23 +477,21 @@
                 },
 
                 selectBlueprint(blueprint) {
-                    console.log('selectBlueprint called', blueprint);
                     this.selectedBlueprint = blueprint;
                     this.formData = {};
                     this.installError = null;
                     this.installSuccess = null;
 
                     // Initialize form data with defaults
-                    Object.keys(blueprint.schema).forEach(fieldName => {
-                        const field = blueprint.schema[fieldName];
+                    const schema = blueprint.schema_json || blueprint.schema || {};
+                    Object.keys(schema).forEach(fieldName => {
+                        const field = schema[fieldName];
                         if (field.default !== undefined) {
                             this.formData[fieldName] = field.default;
                         }
                     });
 
-                    console.log('Setting showModal to true');
                     this.showModal = true;
-                    console.log('showModal is now:', this.showModal);
                 },
 
                 closeModal() {
@@ -511,6 +509,9 @@
                     this.installSuccess = null;
 
                     try {
+                        // Use container_name from form data as the app name, or default to blueprint display name
+                        const appName = this.formData.container_name || this.selectedBlueprint.display_name;
+
                         // Create app instance
                         const createResponse = await fetch('/api/apps/', {
                             method: 'POST',
@@ -518,8 +519,9 @@
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
+                                name: appName,
                                 blueprint_name: this.selectedBlueprint.name,
-                                config: this.formData
+                                inputs: this.formData
                             })
                         });
 
