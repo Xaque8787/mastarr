@@ -477,6 +477,7 @@
                 },
 
                 selectBlueprint(blueprint) {
+                    console.log('selectBlueprint called', blueprint);
                     this.selectedBlueprint = blueprint;
                     this.formData = {};
                     this.installError = null;
@@ -490,7 +491,9 @@
                         }
                     });
 
+                    console.log('Setting showModal to true');
                     this.showModal = true;
+                    console.log('showModal is now:', this.showModal);
                 },
 
                 closeModal() {
