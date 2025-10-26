@@ -141,6 +141,15 @@ class AppInstaller:
             compose_path = stack_path / "docker-compose.yml"
 
             compose_dict = compose_obj.model_dump(exclude_none=True)
+
+            # Convert environment dicts to list format for Docker Compose
+            if 'services' in compose_dict:
+                for service_name, service_config in compose_dict['services'].items():
+                    if 'environment' in service_config and isinstance(service_config['environment'], dict):
+                        service_config['environment'] = [
+                            f"{k}={v}" for k, v in service_config['environment'].items()
+                        ]
+
             with open(compose_path, 'w') as f:
                 yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
 

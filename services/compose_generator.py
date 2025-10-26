@@ -79,25 +79,18 @@ class ComposeGenerator:
         # Apply transforms to convert user inputs to compose format
         service_config = self._apply_transforms(service_config, blueprint, app)
 
-        # Add global environment variables
+        # Add global environment variables (keep as dict for validation)
         if 'environment' not in service_config:
             service_config['environment'] = {}
 
-        # Convert dict to list format if needed
-        if isinstance(service_config['environment'], dict):
-            env_dict = service_config['environment']
-        else:
-            env_dict = {}
+        # Ensure environment is a dict
+        if not isinstance(service_config['environment'], dict):
+            service_config['environment'] = {}
 
         # Add global settings
-        env_dict['PUID'] = global_settings.puid
-        env_dict['PGID'] = global_settings.pgid
-        env_dict['TZ'] = global_settings.timezone
-
-        # Convert to list format for compose file
-        service_config['environment'] = [
-            f"{k}={v}" for k, v in env_dict.items()
-        ]
+        service_config['environment']['PUID'] = global_settings.puid
+        service_config['environment']['PGID'] = global_settings.pgid
+        service_config['environment']['TZ'] = global_settings.timezone
 
         # Ensure networks is set
         if 'networks' not in service_config:
@@ -163,6 +156,14 @@ class ComposeGenerator:
             output_path: Path to write the compose file
         """
         compose_dict = compose.model_dump(exclude_none=True)
+
+        # Convert environment dicts to list format for Docker Compose
+        if 'services' in compose_dict:
+            for service_name, service_config in compose_dict['services'].items():
+                if 'environment' in service_config and isinstance(service_config['environment'], dict):
+                    service_config['environment'] = [
+                        f"{k}={v}" for k, v in service_config['environment'].items()
+                    ]
 
         with open(output_path, 'w') as f:
             yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
