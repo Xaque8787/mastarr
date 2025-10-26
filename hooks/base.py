@@ -28,7 +28,9 @@ class HookContext:
     blueprint_name: str
     container_name: str
     container_ip: Optional[str] = None
-    inputs: Dict[str, Any] = None
+
+    # Full app object with service_data, compose_data, metadata_data, raw_inputs
+    app: Any = None
 
     # Will be populated by hook executor
     db: Any = None

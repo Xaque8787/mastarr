@@ -199,8 +199,8 @@ class AppInstaller:
             hook_name: Name of hook to execute (post_install, pre_uninstall, etc.)
         """
         try:
-            # Get container info
-            container_name = app.inputs.get('container_name', blueprint.name)
+            # Get container info from service_data
+            container_name = app.service_data.get('container_name', app.db_name)
             container_ip = None
 
             try:
@@ -215,14 +215,14 @@ class AppInstaller:
             except docker.errors.NotFound:
                 logger.warning(f"Container {container_name} not found")
 
-            # Build hook context
+            # Build hook context with full app object
             context = HookContext(
                 app_id=app.id,
                 app_name=app.name,
                 blueprint_name=blueprint.name,
                 container_name=container_name,
                 container_ip=container_ip,
-                inputs=app.inputs,
+                app=app,
                 db=self.db,
                 docker_client=self.docker_client
             )
