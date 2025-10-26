@@ -78,7 +78,12 @@ async def create_app(app_data: AppCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(app)
 
-    logger.info(f"Created app: {app.name} (service: {len(service_data)} fields, metadata: {len(metadata_data)} fields)")
+    logger.info(
+        f"Created app: {app.name} "
+        f"(service: {len(service_data)} fields, "
+        f"compose: {len(compose_data)} fields, "
+        f"metadata: {len(metadata_data)} fields)"
+    )
     return app
 
 
@@ -229,6 +234,10 @@ def _route_inputs_to_schemas(
         field_schema = blueprint.schema_json.get(field_name)
         if not field_schema:
             # Field not in blueprint, skip
+            continue
+
+        # Skip fields with compose_transform - they'll be handled by transform phase
+        if field_schema.get('compose_transform'):
             continue
 
         # Get schema routing from field (dot notation)
