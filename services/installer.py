@@ -1,5 +1,6 @@
 import yaml
 import docker
+import subprocess
 from datetime import datetime
 from typing import List, Dict, Set
 from pathlib import Path
@@ -146,9 +147,21 @@ class AppInstaller:
 
             logger.info(f"✓ Wrote compose file to {compose_path}")
 
-            # Run docker-compose up in the stack directory
-            self.docker.compose.up([compose_path], detach=True)
-            logger.info(f"✓ Docker containers started for {app.name}")
+            # Run docker compose up using subprocess to use system docker
+            try:
+                result = subprocess.run(
+                    ["docker", "compose", "-f", str(compose_path), "up", "-d"],
+                    cwd=stack_path,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                logger.info(f"✓ Docker containers started for {app.name}")
+                if result.stdout:
+                    logger.debug(f"Docker output: {result.stdout}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Docker compose failed: {e.stderr}")
+                raise Exception(f"Failed to start containers: {e.stderr}")
 
             app.status = "running"
             app.installed_at = datetime.utcnow()
