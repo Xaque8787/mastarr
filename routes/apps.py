@@ -52,7 +52,7 @@ async def create_app(app_data: AppCreate, db: Session = Depends(get_db)):
         db_name=db_name,
         blueprint_name=app_data.blueprint_name,
         inputs=app_data.inputs,
-        status="pending"
+        status="configured"
     )
 
     db.add(app)
@@ -116,12 +116,55 @@ async def batch_install_apps(
         installer.close()
 
 
+@router.put("/{app_id}", response_model=AppResponse)
+async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db)):
+    """Update an app's configuration"""
+    app = db.query(App).filter(App.id == app_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="App not found")
+
+    # Update inputs if provided
+    if "inputs" in app_data:
+        app.inputs = app_data["inputs"]
+
+    # Update status to configured if it was running (requires reinstall)
+    if app.status == "running":
+        app.status = "configured"
+
+    db.commit()
+    db.refresh(app)
+
+    logger.info(f"Updated app: {app.name}")
+    return app
+
+
+@router.post("/{app_id}/stop")
+async def stop_app(app_id: int, db: Session = Depends(get_db)):
+    """Stop an app's containers"""
+    app = db.query(App).filter(App.id == app_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="App not found")
+
+    if app.status != "running":
+        raise HTTPException(status_code=400, detail="App is not running")
+
+    # TODO: Stop docker containers
+    # For now, just update status
+    app.status = "stopped"
+    db.commit()
+
+    logger.info(f"Stopped app: {app.name}")
+    return {"status": "success", "message": f"{app.name} stopped"}
+
+
 @router.delete("/{app_id}")
 async def delete_app(app_id: int, db: Session = Depends(get_db)):
     """Delete an app (and stop its containers)"""
     app = db.query(App).filter(App.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
+
+    # TODO: Stop and remove docker containers
 
     db.delete(app)
     db.commit()

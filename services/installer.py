@@ -146,7 +146,8 @@ class AppInstaller:
 
             logger.info(f"✓ Wrote compose file to {compose_path}")
 
-            self.docker.compose.up(detach=True, project_directory=str(stack_path))
+            # Run docker-compose up in the stack directory
+            self.docker.compose.up([compose_path], detach=True)
             logger.info(f"✓ Docker containers started for {app.name}")
 
             app.status = "running"
