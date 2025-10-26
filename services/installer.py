@@ -134,9 +134,8 @@ class AppInstaller:
         self.db.commit()
 
         try:
-            validated_inputs = app.inputs
-
-            compose_obj = generate_compose(blueprint, validated_inputs)
+            # Generate compose from app's separated schema data
+            compose_obj = generate_compose(app, blueprint)
 
             stack_path = self.path_resolver.ensure_stack_directory(app.db_name)
             compose_path = stack_path / "docker-compose.yml"
@@ -166,7 +165,7 @@ class AppInstaller:
             app.status = "running"
             app.installed_at = datetime.utcnow()
             app.compose_file_path = str(compose_path)
-            app.compose_data = compose_dict
+            # Note: compose_data is already set during routing, just updating file path
             self.db.commit()
 
             # Execute post-install hook using new hooks system

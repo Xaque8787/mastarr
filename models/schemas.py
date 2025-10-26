@@ -48,6 +48,10 @@ class FieldSchema(BaseModel):
     max_value: Optional[int] = None
     pattern: Optional[str] = None
 
+    # Schema routing - dot notation: "service.image", "compose.networks", "metadata.admin_user"
+    schema: Optional[str] = None
+    compose_transform: Optional[str] = None  # Transform function name: "port_mapping", "volume_mapping"
+
 
 class BlueprintSchema(BaseModel):
     """Complete blueprint definition"""
@@ -92,7 +96,10 @@ class AppResponse(BaseModel):
     blueprint_name: str
     status: str
     error_message: Optional[str] = None
-    inputs: Dict[str, Any]
+    raw_inputs: Dict[str, Any]
+    service_data: Dict[str, Any] = {}
+    compose_data: Dict[str, Any] = {}
+    metadata_data: Dict[str, Any] = {}
     created_at: datetime
     installed_at: Optional[datetime] = None
 
@@ -132,25 +139,53 @@ class GlobalSettingsResponse(BaseModel):
         from_attributes = True
 
 
-class ComposeService(BaseModel):
-    """Docker compose service definition"""
+class ServiceSchema(BaseModel):
+    """Docker compose service definition - allows extra fields for flexibility"""
     image: str
-    container_name: str
+    container_name: Optional[str] = None
     restart: str = "unless-stopped"
-    environment: Optional[List[str]] = None
+    environment: Optional[Dict[str, Any]] = None
     volumes: Optional[List[str]] = None
     ports: Optional[List[str]] = None
     networks: Optional[List[str]] = None
     depends_on: Optional[List[str]] = None
     labels: Optional[Dict[str, str]] = None
 
+    class Config:
+        extra = "allow"  # Allow additional fields not defined in schema
+
 
 class ComposeSchema(BaseModel):
-    """Docker compose file schema"""
+    """Docker compose file schema - top-level compose structure"""
     version: str = "3.9"
-    services: Dict[str, ComposeService]
+    services: Dict[str, ServiceSchema]
     networks: Optional[Dict[str, Any]] = None
     volumes: Optional[Dict[str, Any]] = None
+    secrets: Optional[Dict[str, Any]] = None
+    configs: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"  # Allow additional top-level fields
+
+
+class MetadataSchema(BaseModel):
+    """Application metadata - NOT in compose file, used by hooks and setup"""
+    # Auth/credentials
+    admin_user: Optional[str] = None
+    admin_password: Optional[str] = None
+    api_key: Optional[str] = None
+
+    # App-specific settings
+    enable_hardware_accel: Optional[bool] = None
+    library_paths: Optional[List[str]] = None
+
+    # General metadata
+    author: Optional[str] = None
+    notes: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+    class Config:
+        extra = "allow"  # Accept any additional fields for flexibility
 
 
 # Allow recursive model for dependent_fields

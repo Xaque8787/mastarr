@@ -48,15 +48,19 @@ class App(Base):
     db_name = Column(String, unique=True, nullable=False)
     blueprint_name = Column(String, nullable=False)
 
-    # Status: pending, installing, running, error, stopped
-    status = Column(String, default="pending")
+    # Status: configured, installing, running, error, stopped
+    status = Column(String, default="configured")
     error_message = Column(Text)
 
-    # User's configuration inputs (validated)
-    inputs = Column(JSON, default=dict)
+    # Raw user inputs (kept for reference/debugging)
+    raw_inputs = Column(JSON, default=dict)
 
-    # Generated compose data
-    compose_data = Column(JSON)
+    # Separated schema data
+    service_data = Column(JSON, default=dict)    # ServiceSchema - Docker service config
+    compose_data = Column(JSON, default=dict)    # ComposeSchema - Top-level compose (networks, volumes)
+    metadata_data = Column(JSON, default=dict)   # MetadataSchema - App metadata for hooks
+
+    # Generated compose file path
     compose_file_path = Column(String)
 
     # Timestamps

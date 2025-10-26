@@ -17,7 +17,8 @@
       "label": "Docker Image",
       "default": "jellyfin/jellyfin:latest",
       "required": false,
-      "visible": true
+      "visible": true,
+      "schema": "service.image"
     },
     "container_name": {
       "type": "string",
@@ -25,7 +26,8 @@
       "label": "Container Name",
       "default": "jellyfin",
       "required": false,
-      "visible": true
+      "visible": true,
+      "schema": "service.container_name"
     },
     "host_port": {
       "type": "integer",
@@ -33,7 +35,9 @@
       "label": "Host Port",
       "default": 8096,
       "required": false,
-      "visible": true
+      "visible": true,
+      "schema": "service.ports",
+      "compose_transform": "port_mapping"
     },
     "container_port": {
       "type": "integer",
@@ -41,7 +45,31 @@
       "label": "Container Port",
       "default": 8096,
       "required": false,
-      "visible": false
+      "visible": false,
+      "schema": "service.ports",
+      "compose_transform": "port_mapping"
+    },
+    "config_path": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Config Directory",
+      "default": "./config",
+      "required": false,
+      "visible": true,
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping",
+      "volume_target": "/config"
+    },
+    "cache_path": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Cache Directory",
+      "default": "./cache",
+      "required": false,
+      "visible": true,
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping",
+      "volume_target": "/cache"
     },
     "admin_user": {
       "type": "string",
@@ -49,7 +77,8 @@
       "label": "Admin Username",
       "placeholder": "Enter a username for the Admin user",
       "required": true,
-      "visible": true
+      "visible": true,
+      "schema": "metadata.admin_user"
     },
     "admin_password": {
       "type": "string",
@@ -58,16 +87,18 @@
       "placeholder": "Enter a password for the Admin user",
       "required": true,
       "visible": true,
-      "is_sensitive": true
+      "is_sensitive": true,
+      "schema": "metadata.admin_password"
     },
     "enable_transcoding": {
       "type": "boolean",
       "ui_component": "checkbox",
-      "label": "Enable Transcoding",
+      "label": "Enable Hardware Transcoding",
       "default": false,
       "required": false,
-      "visible": true
+      "visible": true,
+      "schema": "metadata.enable_transcoding"
     }
   },
-  "post_install_hook": null
+  "post_install_hook": "jellyfin.post_install"
 }

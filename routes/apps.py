@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
-from models.database import App, get_session
+from typing import List, Dict, Any
+from models.database import App, Blueprint, get_session
 from models.schemas import AppCreate, AppResponse
 from services.installer import AppInstaller
 from utils.logger import get_logger
@@ -47,11 +47,30 @@ async def create_app(app_data: AppCreate, db: Session = Depends(get_db)):
             detail=f"App with name '{app_data.name}' already exists"
         )
 
+    # Load blueprint to get field schemas
+    blueprint = db.query(Blueprint).filter(
+        Blueprint.name == app_data.blueprint_name
+    ).first()
+    if not blueprint:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Blueprint '{app_data.blueprint_name}' not found"
+        )
+
+    # Route inputs to correct schemas based on field definitions
+    service_data, compose_data, metadata_data = _route_inputs_to_schemas(
+        app_data.inputs,
+        blueprint
+    )
+
     app = App(
         name=app_data.name,
         db_name=db_name,
         blueprint_name=app_data.blueprint_name,
-        inputs=app_data.inputs,
+        raw_inputs=app_data.inputs,
+        service_data=service_data,
+        compose_data=compose_data,
+        metadata_data=metadata_data,
         status="configured"
     )
 
@@ -59,7 +78,7 @@ async def create_app(app_data: AppCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(app)
 
-    logger.info(f"Created app: {app.name}")
+    logger.info(f"Created app: {app.name} (service: {len(service_data)} fields, metadata: {len(metadata_data)} fields)")
     return app
 
 
@@ -125,7 +144,22 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
 
     # Update inputs if provided
     if "inputs" in app_data:
-        app.inputs = app_data["inputs"]
+        # Load blueprint for schema routing
+        blueprint = db.query(Blueprint).filter(
+            Blueprint.name == app.blueprint_name
+        ).first()
+
+        if blueprint:
+            # Re-route inputs to schemas
+            service_data, compose_data, metadata_data = _route_inputs_to_schemas(
+                app_data["inputs"],
+                blueprint
+            )
+
+            app.raw_inputs = app_data["inputs"]
+            app.service_data = service_data
+            app.compose_data = compose_data
+            app.metadata_data = metadata_data
 
     # Update status to configured if it was running (requires reinstall)
     if app.status == "running":
@@ -171,3 +205,85 @@ async def delete_app(app_id: int, db: Session = Depends(get_db)):
 
     logger.info(f"Deleted app: {app.name}")
     return {"status": "success", "message": f"{app.name} deleted"}
+
+
+def _route_inputs_to_schemas(
+    inputs: Dict[str, Any],
+    blueprint: Blueprint
+) -> tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+    """
+    Route user inputs to correct schemas based on blueprint field definitions.
+
+    Args:
+        inputs: User's form inputs
+        blueprint: Blueprint with field schemas
+
+    Returns:
+        Tuple of (service_data, compose_data, metadata_data)
+    """
+    service_data = {}
+    compose_data = {}
+    metadata_data = {}
+
+    for field_name, field_value in inputs.items():
+        field_schema = blueprint.schema_json.get(field_name)
+        if not field_schema:
+            # Field not in blueprint, skip
+            continue
+
+        # Get schema routing from field (dot notation)
+        schema_path = field_schema.get('schema')
+        if not schema_path:
+            # No schema defined, default to service
+            schema_path = 'service'
+
+        # Parse schema path: "service.image", "compose.networks", "metadata.admin_user"
+        parts = schema_path.split('.', 1)
+        schema_type = parts[0]
+
+        if schema_type == 'service':
+            if len(parts) > 1:
+                # Nested path like "service.environment.VAR_NAME"
+                _set_nested_value(service_data, parts[1], field_value)
+            else:
+                # Direct service field (shouldn't happen, but handle it)
+                service_data[field_name] = field_value
+
+        elif schema_type == 'compose':
+            if len(parts) > 1:
+                _set_nested_value(compose_data, parts[1], field_value)
+            else:
+                compose_data[field_name] = field_value
+
+        elif schema_type == 'metadata':
+            if len(parts) > 1:
+                _set_nested_value(metadata_data, parts[1], field_value)
+            else:
+                metadata_data[field_name] = field_value
+
+    return service_data, compose_data, metadata_data
+
+
+def _set_nested_value(data: Dict[str, Any], path: str, value: Any):
+    """
+    Set a value at a nested path like 'environment.VAR_NAME' or just 'image'.
+
+    Args:
+        data: Dictionary to modify
+        path: Dot-separated path (e.g., "environment.VAR_NAME" or "image")
+        value: Value to set
+    """
+    if '.' in path:
+        # Nested path
+        keys = path.split('.')
+        current = data
+
+        for key in keys[:-1]:
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+
+        current[keys[-1]] = value
+    else:
+        # Simple path
+        data[path] = value

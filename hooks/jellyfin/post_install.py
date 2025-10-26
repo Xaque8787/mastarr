@@ -26,14 +26,21 @@ async def run(context: HookContext):
     """
     logger.info("Starting Jellyfin post-install configuration")
 
-    # Extract configuration from inputs
-    admin_user = context.inputs.get('admin_user')
-    admin_password = context.inputs.get('admin_password')
-    host_port = context.inputs.get('host_port', 8096)
+    # Extract configuration from metadata (NOT from raw inputs)
+    admin_user = context.app.metadata_data.get('admin_user')
+    admin_password = context.app.metadata_data.get('admin_password')
+
+    # Get container info from service_data
+    container_name = context.app.service_data.get('container_name', 'jellyfin')
+    host_port = context.app.raw_inputs.get('host_port', 8096)
 
     # Build Jellyfin URL
-    jellyfin_url = f"http://{context.container_ip or 'localhost'}:{host_port}"
+    jellyfin_url = f"http://{container_name}:{host_port}"
     logger.info(f"Jellyfin URL: {jellyfin_url}")
+
+    if not admin_user or not admin_password:
+        logger.error("Admin credentials not found in metadata")
+        raise ValueError("Missing admin_user or admin_password in metadata")
 
     # Wait for Jellyfin to be ready
     if not await wait_for_jellyfin(jellyfin_url):
