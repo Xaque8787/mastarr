@@ -169,23 +169,24 @@ class ComposeSchema(BaseModel):
 
 
 class MetadataSchema(BaseModel):
-    """Application metadata - NOT in compose file, used by hooks and setup"""
-    # Auth/credentials
+    """
+    Application metadata - NOT in compose file, used by hooks and setup.
+
+    Common fields defined here, app-specific fields handled via extra='allow'.
+    Blueprint JSON is the source of truth for all app-specific metadata fields.
+    """
+    # Common auth/credentials (used by many apps)
     admin_user: Optional[str] = None
     admin_password: Optional[str] = None
     api_key: Optional[str] = None
 
-    # App-specific settings
-    enable_hardware_accel: Optional[bool] = None
-    library_paths: Optional[List[str]] = None
-
-    # General metadata
+    # General metadata (documentation/organization)
     author: Optional[str] = None
     notes: Optional[str] = None
     tags: Optional[List[str]] = None
 
     class Config:
-        extra = "allow"  # Accept any additional fields for flexibility
+        extra = "allow"  # All app-specific fields go through extra (e.g., enable_transcoding, library_paths, etc.)
 
 
 # Allow recursive model for dependent_fields
