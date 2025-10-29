@@ -163,15 +163,12 @@ class AppInstaller:
 
             generator.close()
 
-            host_stack_path = self.path_resolver.get_host_stack_path(app.db_name)
-            host_compose_path = os.path.join(host_stack_path, "docker-compose.yml")
-
             try:
                 result = subprocess.run(
                     [
                         "docker", "compose",
-                        "--project-directory", host_stack_path,
-                        "-f", host_compose_path,
+                        "--project-directory", str(stack_path),
+                        "-f", str(compose_path),
                         "up", "-d"
                     ],
                     check=True,
