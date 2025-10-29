@@ -11,11 +11,21 @@
     "jellyfin": "10.21.12.3"
   },
   "schema": {
+    "ipv4_address": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Static IP Address",
+      "default": "10.21.12.3",
+      "required": false,
+      "visible": false,
+      "advanced": true,
+      "schema": "service.ipv4_address"
+    },
     "image": {
       "type": "string",
       "ui_component": "text",
       "label": "Docker Image",
-      "default": "jellyfin/jellyfin:${TAG:-latest}",
+      "default": "jellyfin/jellyfin",
       "required": false,
       "visible": true,
       "schema": "service.image"
@@ -28,7 +38,8 @@
       "description": "Docker image tag/version to use",
       "required": false,
       "visible": true,
-      "advanced": true
+      "advanced": true,
+      "schema": "env.TAG"
     },
     "container_name": {
       "type": "string",

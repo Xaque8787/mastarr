@@ -246,9 +246,13 @@ def _route_inputs_to_schemas(
             # No schema defined, default to service
             schema_path = 'service'
 
-        # Parse schema path: "service.image", "compose.networks", "metadata.admin_user"
+        # Parse schema path: "service.image", "compose.networks", "metadata.admin_user", "env.TAG"
         parts = schema_path.split('.', 1)
         schema_type = parts[0]
+
+        # Skip env.* fields - they go to .env file only, not compose or metadata
+        if schema_type == 'env':
+            continue
 
         if schema_type == 'service':
             if len(parts) > 1:

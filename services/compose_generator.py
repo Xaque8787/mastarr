@@ -75,6 +75,9 @@ class ComposeGenerator:
 
         service_config = self._apply_transforms(service_config, blueprint, app)
 
+        if 'image' in service_config and not service_config['image'].endswith('}'):
+            service_config['image'] = f"{service_config['image']}:${{TAG:-latest}}"
+
         service_config = self._transform_volumes_to_long_form(service_config)
         service_config = self._transform_ports_to_long_form(service_config)
 
@@ -88,8 +91,23 @@ class ComposeGenerator:
         service_config['environment']['PGID'] = global_settings.pgid
         service_config['environment']['TZ'] = global_settings.timezone
 
+        ipv4_address = service_config.pop('ipv4_address', None)
+
         if 'networks' not in service_config:
             service_config['networks'] = [global_settings.network_name]
+
+        if ipv4_address:
+            if isinstance(service_config['networks'], list):
+                network_name = service_config['networks'][0] if service_config['networks'] else global_settings.network_name
+                service_config['networks'] = {
+                    network_name: {
+                        "ipv4_address": ipv4_address
+                    }
+                }
+            elif isinstance(service_config['networks'], dict):
+                for net_name in service_config['networks']:
+                    service_config['networks'][net_name]['ipv4_address'] = ipv4_address
+                    break
 
         if 'restart' not in service_config:
             service_config['restart'] = "unless-stopped"
