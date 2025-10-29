@@ -380,9 +380,16 @@
                 <div x-show="installError" class="error-message" x-text="installError"></div>
                 <div x-show="installSuccess" class="success-message" x-text="installSuccess"></div>
 
+                <div style="margin-bottom: 16px;">
+                    <button type="button" class="btn btn-secondary" @click="showAdvanced = !showAdvanced" style="width: 100%;">
+                        <span x-show="!showAdvanced">Show Advanced Options</span>
+                        <span x-show="showAdvanced">Hide Advanced Options</span>
+                    </button>
+                </div>
+
                 <form @submit.prevent="installApp()">
                     <template x-for="(field, fieldName) in (selectedBlueprint?.schema_json || selectedBlueprint?.schema)" :key="fieldName">
-                        <div class="form-group" x-show="field.visible">
+                        <div class="form-group" x-show="field.visible && (!field.advanced || showAdvanced)">
                             <!-- Text Input -->
                             <template x-if="field.ui_component === 'text'">
                                 <div>
@@ -480,6 +487,12 @@
                             </span>
                         </h3>
                         <p><strong>Blueprint:</strong> <span x-text="app.blueprint_name"></span></p>
+                        <p x-show="app.service_data?.image">
+                            <strong>Image:</strong> <span x-text="app.service_data?.image"></span>
+                        </p>
+                        <p x-show="app.raw_inputs?.tag">
+                            <strong>Tag:</strong> <span x-text="app.raw_inputs?.tag"></span>
+                        </p>
                         <p x-show="app.installed_at">
                             <strong>Installed:</strong>
                             <span x-text="new Date(app.installed_at).toLocaleString()"></span>
@@ -539,6 +552,7 @@
                 installingAll: false,
                 installError: null,
                 installSuccess: null,
+                showAdvanced: false,
 
                 async init() {
                     await this.loadSystemInfo();
@@ -584,6 +598,7 @@
                     this.formData = {};
                     this.installError = null;
                     this.installSuccess = null;
+                    this.showAdvanced = false;
 
                     // Initialize form data with defaults
                     const schema = blueprint.schema_json || blueprint.schema || {};
@@ -621,6 +636,7 @@
                     this.saving = false;
                     this.installError = null;
                     this.installSuccess = null;
+                    this.showAdvanced = false;
                 },
 
                 async installApp() {

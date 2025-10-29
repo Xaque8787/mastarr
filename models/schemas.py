@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any, Literal
+from typing import Optional, List, Dict, Any, Literal, Union
 from datetime import datetime
 
 
@@ -148,7 +148,7 @@ class ServiceSchema(BaseModel):
     environment: Optional[Dict[str, Any]] = None
     volumes: Optional[List[Any]] = None
     ports: Optional[List[Any]] = None
-    networks: Optional[List[str]] = None
+    networks: Optional[Union[List[str], Dict[str, Any]]] = None
     depends_on: Optional[List[str]] = None
     labels: Optional[Dict[str, str]] = None
 
