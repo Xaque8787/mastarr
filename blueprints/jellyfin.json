@@ -15,10 +15,20 @@
       "type": "string",
       "ui_component": "text",
       "label": "Docker Image",
-      "default": "jellyfin/jellyfin:latest",
+      "default": "jellyfin/jellyfin:${TAG:-latest}",
       "required": false,
       "visible": true,
       "schema": "service.image"
+    },
+    "tag": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Image Tag",
+      "default": "latest",
+      "description": "Docker image tag/version to use",
+      "required": false,
+      "visible": true,
+      "advanced": true
     },
     "container_name": {
       "type": "string",
@@ -56,6 +66,7 @@
       "default": "./config",
       "required": false,
       "visible": true,
+      "advanced": true,
       "schema": "service.volumes",
       "compose_transform": "volume_mapping",
       "volume_target": "/config"
@@ -67,6 +78,7 @@
       "default": "./cache",
       "required": false,
       "visible": true,
+      "advanced": true,
       "schema": "service.volumes",
       "compose_transform": "volume_mapping",
       "volume_target": "/cache"

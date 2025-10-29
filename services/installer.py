@@ -125,6 +125,8 @@ class AppInstaller:
 
     async def install_single_app(self, app_id: int):
         """Install a single app"""
+        from services.compose_generator import ComposeGenerator
+
         app = self.db.query(App).filter(App.id == app_id).one()
         blueprint = self.db.query(Blueprint).filter(Blueprint.name == app.blueprint_name).one()
 
@@ -134,15 +136,18 @@ class AppInstaller:
         self.db.commit()
 
         try:
-            # Generate compose from app's separated schema data
-            compose_obj = generate_compose(app, blueprint)
+            generator = ComposeGenerator()
+
+            compose_obj = generator.generate(app, blueprint)
 
             stack_path = self.path_resolver.ensure_stack_directory(app.db_name)
             compose_path = stack_path / "docker-compose.yml"
+            env_path = stack_path / ".env"
+
+            generator.write_env_file(app.db_name, app.raw_inputs, str(env_path))
 
             compose_dict = compose_obj.model_dump(exclude_none=True)
 
-            # Convert environment dicts to list format for Docker Compose
             if 'services' in compose_dict:
                 for service_name, service_config in compose_dict['services'].items():
                     if 'environment' in service_config and isinstance(service_config['environment'], dict):
@@ -155,11 +160,19 @@ class AppInstaller:
 
             logger.info(f"✓ Wrote compose file to {compose_path}")
 
-            # Run docker compose up using subprocess to use system docker
+            generator.close()
+
+            host_stack_path = self.path_resolver.get_host_stack_path(app.db_name)
+            host_compose_path = os.path.join(host_stack_path, "docker-compose.yml")
+
             try:
                 result = subprocess.run(
-                    ["docker", "compose", "-f", str(compose_path), "up", "-d"],
-                    cwd=stack_path,
+                    [
+                        "docker", "compose",
+                        "--project-directory", host_stack_path,
+                        "-f", host_compose_path,
+                        "up", "-d"
+                    ],
                     check=True,
                     capture_output=True,
                     text=True
@@ -174,10 +187,8 @@ class AppInstaller:
             app.status = "running"
             app.installed_at = datetime.utcnow()
             app.compose_file_path = str(compose_path)
-            # Note: compose_data is already set during routing, just updating file path
             self.db.commit()
 
-            # Execute post-install hook using new hooks system
             await self._execute_app_hook(app, blueprint, "post_install")
 
             logger.info(f"✓ {app.name} installed successfully")

@@ -32,6 +32,7 @@ class FieldSchema(BaseModel):
     required: bool = False
     visible: bool = True
     is_sensitive: bool = False
+    advanced: bool = False
 
     # For dropdowns/radios
     options: Optional[List[UIOption]] = None
@@ -145,8 +146,8 @@ class ServiceSchema(BaseModel):
     container_name: Optional[str] = None
     restart: str = "unless-stopped"
     environment: Optional[Dict[str, Any]] = None
-    volumes: Optional[List[str]] = None
-    ports: Optional[List[str]] = None
+    volumes: Optional[List[Any]] = None
+    ports: Optional[List[Any]] = None
     networks: Optional[List[str]] = None
     depends_on: Optional[List[str]] = None
     labels: Optional[Dict[str, str]] = None
