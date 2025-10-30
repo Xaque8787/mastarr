@@ -592,27 +592,47 @@
                     return this.apps.filter(app => app.status === 'configured');
                 },
 
-                selectBlueprint(blueprint) {
-                    this.selectedBlueprint = blueprint;
+                async selectBlueprint(blueprint) {
+                    this.selectedBlueprint = null;
                     this.editingApp = null;
                     this.formData = {};
                     this.installError = null;
                     this.installSuccess = null;
                     this.showAdvanced = false;
 
-                    // Initialize form data with defaults
-                    const schema = blueprint.schema_json || blueprint.schema || {};
-                    Object.keys(schema).forEach(fieldName => {
-                        const field = schema[fieldName];
-                        if (field.default !== undefined) {
-                            this.formData[fieldName] = field.default;
+                    try {
+                        // Fetch the blueprint schema with expanded template variables
+                        const response = await fetch(`/api/blueprints/${blueprint.name}/schema?expand_templates=true`);
+                        if (!response.ok) {
+                            throw new Error('Failed to load blueprint schema');
                         }
-                    });
 
-                    this.showModal = true;
+                        const schemaData = await response.json();
+
+                        // Create a blueprint object with the expanded schema
+                        this.selectedBlueprint = {
+                            ...blueprint,
+                            schema_json: schemaData.schema,
+                            schema: schemaData.schema
+                        };
+
+                        // Initialize form data with expanded defaults
+                        const schema = schemaData.schema || {};
+                        Object.keys(schema).forEach(fieldName => {
+                            const field = schema[fieldName];
+                            if (field.default !== undefined) {
+                                this.formData[fieldName] = field.default;
+                            }
+                        });
+
+                        this.showModal = true;
+                    } catch (error) {
+                        console.error('Failed to load blueprint schema:', error);
+                        alert('Failed to load blueprint configuration. Please try again.');
+                    }
                 },
 
-                editApp(app) {
+                async editApp(app) {
                     // Find the blueprint for this app
                     const blueprint = this.blueprints.find(b => b.name === app.blueprint_name);
                     if (!blueprint) {
@@ -620,12 +640,37 @@
                         return;
                     }
 
-                    this.selectedBlueprint = blueprint;
+                    this.selectedBlueprint = null;
                     this.editingApp = app;
-                    this.formData = { ...app.inputs };
+                    this.formData = {};
                     this.installError = null;
                     this.installSuccess = null;
-                    this.showModal = true;
+                    this.showAdvanced = false;
+
+                    try {
+                        // Fetch the blueprint schema with expanded template variables
+                        const response = await fetch(`/api/blueprints/${blueprint.name}/schema?expand_templates=true`);
+                        if (!response.ok) {
+                            throw new Error('Failed to load blueprint schema');
+                        }
+
+                        const schemaData = await response.json();
+
+                        // Create a blueprint object with the expanded schema
+                        this.selectedBlueprint = {
+                            ...blueprint,
+                            schema_json: schemaData.schema,
+                            schema: schemaData.schema
+                        };
+
+                        // Initialize form data with app's current values
+                        this.formData = { ...app.raw_inputs };
+
+                        this.showModal = true;
+                    } catch (error) {
+                        console.error('Failed to load blueprint schema:', error);
+                        alert('Failed to load blueprint configuration. Please try again.');
+                    }
                 },
 
                 closeModal() {
