@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, field_validator
 from typing import Optional, List, Dict, Any, Literal, Union
 from datetime import datetime
 
@@ -22,7 +22,9 @@ class FieldSchema(BaseModel):
     type: Literal["string", "integer", "boolean", "object", "array"]
     ui_component: Literal[
         "text", "password", "checkbox", "dropdown",
-        "radio_group", "conditional", "number", "textarea"
+        "radio_group", "conditional", "number", "textarea",
+        "port_mapping", "volume_mapping", "network_config",
+        "device_mapping", "healthcheck_config"
     ]
     label: str
     description: Optional[str] = None
@@ -48,6 +50,14 @@ class FieldSchema(BaseModel):
     min_value: Optional[int] = None
     max_value: Optional[int] = None
     pattern: Optional[str] = None
+
+    # For compound fields (type: "object")
+    fields: Optional[Dict[str, "FieldSchema"]] = None
+
+    # For array fields
+    item_schema: Optional["FieldSchema"] = None
+    min_items: Optional[int] = None
+    max_items: Optional[int] = None
 
     # Schema routing - dot notation: "service.image", "compose.networks", "metadata.admin_user"
     schema: Optional[str] = None
@@ -140,17 +150,166 @@ class GlobalSettingsResponse(BaseModel):
         from_attributes = True
 
 
-class ServiceSchema(BaseModel):
-    """Docker compose service definition - allows extra fields for flexibility"""
-    image: str
-    container_name: Optional[str] = None
-    restart: str = "unless-stopped"
-    environment: Optional[Dict[str, Any]] = None
-    volumes: Optional[List[Any]] = None
-    ports: Optional[List[Any]] = None
-    networks: Optional[Union[List[str], Dict[str, Any]]] = None
-    depends_on: Optional[List[str]] = None
+class ServiceBindVolumeSchema(BaseModel):
+    """
+    Long syntax for bind mount volumes.
+    Automatically prepends ${HOST_PATH}/ to relative paths starting with ./
+    """
+    type: Literal["bind"] = "bind"
+    source: str
+    target: str
+    read_only: Optional[bool] = False
+    bind: Optional[Dict[str, Any]] = None
+
+    @field_validator('source')
+    @classmethod
+    def transform_relative_path(cls, v: str) -> str:
+        """Prepend ${HOST_PATH}/ to relative paths"""
+        if v.startswith('./'):
+            return f"${{HOST_PATH}}/{v[2:]}"
+        return v
+
+
+class ServiceNamedVolumeSchema(BaseModel):
+    """Long syntax for named Docker volumes"""
+    type: Literal["volume"] = "volume"
+    source: str
+    target: str
+    read_only: Optional[bool] = False
+    volume: Optional[Dict[str, Any]] = None
+
+
+class ServiceTmpfsVolumeSchema(BaseModel):
+    """Long syntax for tmpfs volumes"""
+    type: Literal["tmpfs"] = "tmpfs"
+    target: str
+    tmpfs: Optional[Dict[str, Any]] = None
+
+
+class PortMappingSchema(BaseModel):
+    """Long syntax for port mappings"""
+    target: int
+    published: int
+    protocol: Literal["tcp", "udp"] = "tcp"
+    mode: Optional[Literal["host", "ingress"]] = None
+
+
+class ServiceNetworkConfigSchema(BaseModel):
+    """Network configuration for a service"""
+    ipv4_address: Optional[str] = None
+    ipv6_address: Optional[str] = None
+    aliases: Optional[List[str]] = None
+    priority: Optional[int] = None
+
+
+class ComposeNetworkSchema(BaseModel):
+    """Top-level network definition in compose file"""
+    external: Optional[bool] = None
+    driver: Optional[str] = None
+    driver_opts: Optional[Dict[str, str]] = None
+    ipam: Optional[Dict[str, Any]] = None
+    internal: Optional[bool] = None
+    attachable: Optional[bool] = None
     labels: Optional[Dict[str, str]] = None
+
+
+class ComposeVolumeSchema(BaseModel):
+    """Top-level volume definition in compose file"""
+    driver: Optional[str] = "local"
+    driver_opts: Optional[Dict[str, str]] = None
+    external: Optional[bool] = None
+    name: Optional[str] = None
+    labels: Optional[Dict[str, str]] = None
+
+
+class HealthcheckSchema(BaseModel):
+    """Healthcheck configuration"""
+    test: Union[str, List[str]]
+    interval: Optional[str] = None
+    timeout: Optional[str] = None
+    retries: Optional[int] = None
+    start_period: Optional[str] = None
+
+
+class DeviceSchema(BaseModel):
+    """Device mapping for hardware access"""
+    host_path: str
+    container_path: str
+    permissions: Optional[str] = "rwm"
+
+
+class ServiceSchema(BaseModel):
+    """
+    Docker compose service definition with comprehensive Docker Compose support.
+    Allows extra fields for flexibility with uncommon Docker Compose options.
+    """
+    # Required
+    image: str
+
+    # Common options
+    container_name: Optional[str] = None
+    restart: Optional[str] = "unless-stopped"
+
+    # Environment & Config
+    environment: Optional[Dict[str, Any]] = None
+    env_file: Optional[Union[str, List[str]]] = None
+
+    # Volumes & Storage
+    volumes: Optional[List[Union[ServiceBindVolumeSchema, ServiceNamedVolumeSchema, ServiceTmpfsVolumeSchema, str]]] = None
+
+    # Networking
+    ports: Optional[List[Union[PortMappingSchema, str]]] = None
+    networks: Optional[Union[List[str], Dict[str, ServiceNetworkConfigSchema]]] = None
+    hostname: Optional[str] = None
+    domainname: Optional[str] = None
+
+    # Runtime
+    command: Optional[Union[str, List[str]]] = None
+    entrypoint: Optional[Union[str, List[str]]] = None
+    working_dir: Optional[str] = None
+    user: Optional[str] = None
+
+    # Resources & Limits
+    mem_limit: Optional[str] = None
+    mem_reservation: Optional[str] = None
+    memswap_limit: Optional[str] = None
+    cpus: Optional[float] = None
+    cpu_shares: Optional[int] = None
+    cpu_quota: Optional[int] = None
+    cpu_period: Optional[int] = None
+    cpuset: Optional[str] = None
+
+    # Security
+    privileged: Optional[bool] = None
+    cap_add: Optional[List[str]] = None
+    cap_drop: Optional[List[str]] = None
+    security_opt: Optional[List[str]] = None
+
+    # Devices & Hardware
+    devices: Optional[List[Union[DeviceSchema, str]]] = None
+
+    # Health & Monitoring
+    healthcheck: Optional[HealthcheckSchema] = None
+
+    # Dependencies
+    depends_on: Optional[Union[List[str], Dict[str, Any]]] = None
+
+    # Metadata
+    labels: Optional[Dict[str, str]] = None
+
+    # System options
+    sysctls: Optional[Dict[str, Any]] = None
+    ulimits: Optional[Dict[str, Any]] = None
+    shm_size: Optional[str] = None
+
+    # Logging
+    logging: Optional[Dict[str, Any]] = None
+
+    # Other common options
+    stdin_open: Optional[bool] = None
+    tty: Optional[bool] = None
+    stop_grace_period: Optional[str] = None
+    stop_signal: Optional[str] = None
 
     class Config:
         extra = "allow"  # Allow additional fields not defined in schema
@@ -160,8 +319,8 @@ class ComposeSchema(BaseModel):
     """Docker compose file schema - top-level compose structure"""
     version: str = "3.9"
     services: Dict[str, ServiceSchema]
-    networks: Optional[Dict[str, Any]] = None
-    volumes: Optional[Dict[str, Any]] = None
+    networks: Optional[Dict[str, Union[ComposeNetworkSchema, Any]]] = None
+    volumes: Optional[Dict[str, Union[ComposeVolumeSchema, Any]]] = None
     secrets: Optional[Dict[str, Any]] = None
     configs: Optional[Dict[str, Any]] = None
 

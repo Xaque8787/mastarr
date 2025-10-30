@@ -145,7 +145,7 @@ class AppInstaller:
             compose_path = stack_path / "docker-compose.yml"
             env_path = stack_path / ".env"
 
-            generator.write_env_file(app.db_name, app.raw_inputs, str(env_path))
+            generator.write_env_file(app.db_name, app.raw_inputs, blueprint, str(env_path))
 
             compose_dict = compose_obj.model_dump(exclude_none=True)
 

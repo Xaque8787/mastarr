@@ -11,16 +11,6 @@
     "jellyfin": "10.21.12.3"
   },
   "schema": {
-    "ipv4_address": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Static IP Address",
-      "default": "10.21.12.3",
-      "required": false,
-      "visible": false,
-      "advanced": true,
-      "schema": "service.ipv4_address"
-    },
     "image": {
       "type": "string",
       "ui_component": "text",
@@ -28,6 +18,7 @@
       "default": "jellyfin/jellyfin",
       "required": false,
       "visible": true,
+      "advanced": false,
       "schema": "service.image"
     },
     "tag": {
@@ -48,51 +39,223 @@
       "default": "jellyfin",
       "required": false,
       "visible": true,
+      "advanced": false,
       "schema": "service.container_name"
     },
-    "host_port": {
-      "type": "integer",
-      "ui_component": "number",
-      "label": "Host Port",
-      "default": 8096,
-      "required": false,
-      "visible": true,
-      "schema": "service.ports",
-      "compose_transform": "port_mapping"
-    },
-    "container_port": {
-      "type": "integer",
-      "ui_component": "number",
-      "label": "Container Port",
-      "default": 8096,
+    "restart_policy": {
+      "type": "string",
+      "ui_component": "dropdown",
+      "label": "Restart Policy",
+      "default": "unless-stopped",
+      "options": [
+        {"label": "No", "value": "no"},
+        {"label": "Always", "value": "always"},
+        {"label": "On Failure", "value": "on-failure"},
+        {"label": "Unless Stopped", "value": "unless-stopped"}
+      ],
       "required": false,
       "visible": false,
-      "schema": "service.ports",
-      "compose_transform": "port_mapping"
+      "advanced": true,
+      "schema": "service.restart"
     },
-    "config_path": {
+    "puid_env": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "PUID",
+      "default": "${GLOBAL.PUID}",
+      "description": "User ID for file permissions",
+      "required": false,
+      "visible": false,
+      "advanced": true,
+      "schema": "service.environment.PUID"
+    },
+    "pgid_env": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "PGID",
+      "default": "${GLOBAL.PGID}",
+      "description": "Group ID for file permissions",
+      "required": false,
+      "visible": false,
+      "advanced": true,
+      "schema": "service.environment.PGID"
+    },
+    "tz_env": {
       "type": "string",
       "ui_component": "text",
-      "label": "Config Directory",
-      "default": "./config",
+      "label": "Timezone",
+      "default": "${GLOBAL.TIMEZONE}",
+      "description": "Container timezone",
+      "required": false,
+      "visible": false,
+      "advanced": true,
+      "schema": "service.environment.TZ"
+    },
+    "web_port": {
+      "type": "object",
+      "ui_component": "port_mapping",
+      "label": "Web Interface Port",
+      "default": {
+        "published": 8096,
+        "target": 8096,
+        "protocol": "tcp"
+      },
+      "fields": {
+        "published": {
+          "type": "integer",
+          "ui_component": "number",
+          "label": "Host Port",
+          "default": 8096
+        },
+        "target": {
+          "type": "integer",
+          "ui_component": "number",
+          "label": "Container Port",
+          "default": 8096
+        },
+        "protocol": {
+          "type": "string",
+          "ui_component": "dropdown",
+          "label": "Protocol",
+          "default": "tcp",
+          "options": [
+            {"label": "TCP", "value": "tcp"},
+            {"label": "UDP", "value": "udp"}
+          ]
+        }
+      },
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.ports"
+    },
+    "config_volume": {
+      "type": "object",
+      "ui_component": "volume_mapping",
+      "label": "Config Volume",
+      "default": {
+        "type": "bind",
+        "source": "./config",
+        "target": "/config",
+        "read_only": false
+      },
+      "fields": {
+        "type": {
+          "type": "string",
+          "ui_component": "dropdown",
+          "label": "Type",
+          "default": "bind",
+          "options": [
+            {"label": "Bind Mount", "value": "bind"},
+            {"label": "Named Volume", "value": "volume"}
+          ]
+        },
+        "source": {
+          "type": "string",
+          "ui_component": "text",
+          "label": "Host Path",
+          "default": "./config",
+          "placeholder": "./config"
+        },
+        "target": {
+          "type": "string",
+          "ui_component": "text",
+          "label": "Container Path",
+          "default": "/config",
+          "placeholder": "/config"
+        },
+        "read_only": {
+          "type": "boolean",
+          "ui_component": "checkbox",
+          "label": "Read Only",
+          "default": false
+        }
+      },
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.volumes"
+    },
+    "cache_volume": {
+      "type": "object",
+      "ui_component": "volume_mapping",
+      "label": "Cache Volume",
+      "default": {
+        "type": "bind",
+        "source": "./cache",
+        "target": "/cache",
+        "read_only": false
+      },
+      "fields": {
+        "type": {
+          "type": "string",
+          "ui_component": "dropdown",
+          "label": "Type",
+          "default": "bind",
+          "options": [
+            {"label": "Bind Mount", "value": "bind"},
+            {"label": "Named Volume", "value": "volume"}
+          ]
+        },
+        "source": {
+          "type": "string",
+          "ui_component": "text",
+          "label": "Host Path",
+          "default": "./cache",
+          "placeholder": "./cache"
+        },
+        "target": {
+          "type": "string",
+          "ui_component": "text",
+          "label": "Container Path",
+          "default": "/cache",
+          "placeholder": "/cache"
+        },
+        "read_only": {
+          "type": "boolean",
+          "ui_component": "checkbox",
+          "label": "Read Only",
+          "default": false
+        }
+      },
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.volumes",
-      "compose_transform": "volume_mapping",
-      "volume_target": "/config"
+      "schema": "service.volumes"
     },
-    "cache_path": {
+    "service_network": {
       "type": "string",
       "ui_component": "text",
-      "label": "Cache Directory",
-      "default": "./cache",
+      "label": "Network Name",
+      "default": "${GLOBAL.NETWORK_NAME}",
+      "description": "Docker network to attach to",
       "required": false,
-      "visible": true,
+      "visible": false,
       "advanced": true,
-      "schema": "service.volumes",
-      "compose_transform": "volume_mapping",
-      "volume_target": "/cache"
+      "schema": "service.networks"
+    },
+    "ipv4_address": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Static IP Address",
+      "default": "10.21.12.3",
+      "description": "Static IPv4 address for this container",
+      "required": false,
+      "visible": false,
+      "advanced": true,
+      "schema": "service.network_config.${GLOBAL.NETWORK_NAME}.ipv4_address"
+    },
+    "compose_network_mastarr": {
+      "type": "object",
+      "ui_component": "text",
+      "label": "Network Definition",
+      "default": {
+        "external": true
+      },
+      "required": false,
+      "visible": false,
+      "advanced": false,
+      "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
     },
     "admin_user": {
       "type": "string",
@@ -101,6 +264,7 @@
       "placeholder": "Enter a username for the Admin user",
       "required": true,
       "visible": true,
+      "advanced": false,
       "schema": "metadata.admin_user"
     },
     "admin_password": {
@@ -110,6 +274,7 @@
       "placeholder": "Enter a password for the Admin user",
       "required": true,
       "visible": true,
+      "advanced": false,
       "is_sensitive": true,
       "schema": "metadata.admin_password"
     },
@@ -120,6 +285,7 @@
       "default": false,
       "required": false,
       "visible": true,
+      "advanced": false,
       "schema": "metadata.enable_transcoding"
     }
   },

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
-from models.database import App, Blueprint, get_session
+from models.database import App, Blueprint, GlobalSettings, get_session
 from models.schemas import AppCreate, AppResponse
 from services.installer import AppInstaller
 from utils.logger import get_logger
+from utils.template_expander import TemplateExpander
 
 logger = get_logger("mastarr.routes.apps")
 router = APIRouter(prefix="/api/apps", tags=["apps"])
@@ -57,17 +58,32 @@ async def create_app(app_data: AppCreate, db: Session = Depends(get_db)):
             detail=f"Blueprint '{app_data.blueprint_name}' not found"
         )
 
+    # Load global settings for template expansion
+    global_settings = db.query(GlobalSettings).first()
+    if not global_settings:
+        global_settings = GlobalSettings()
+        db.add(global_settings)
+        db.commit()
+
+    # Expand template variables in blueprint schema
+    expander = TemplateExpander(global_settings, db_name)
+    expanded_schema = expander.expand_blueprint_schema(blueprint.schema_json)
+
+    # Apply defaults where user didn't provide values
+    complete_inputs = expander.apply_defaults_to_inputs(app_data.inputs, expanded_schema)
+
     # Route inputs to correct schemas based on field definitions
     service_data, compose_data, metadata_data = _route_inputs_to_schemas(
-        app_data.inputs,
-        blueprint
+        complete_inputs,
+        blueprint,
+        expanded_schema
     )
 
     app = App(
         name=app_data.name,
         db_name=db_name,
         blueprint_name=app_data.blueprint_name,
-        raw_inputs=app_data.inputs,
+        raw_inputs=complete_inputs,
         service_data=service_data,
         compose_data=compose_data,
         metadata_data=metadata_data,
@@ -155,13 +171,28 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
         ).first()
 
         if blueprint:
+            # Load global settings for template expansion
+            global_settings = db.query(GlobalSettings).first()
+            if not global_settings:
+                global_settings = GlobalSettings()
+                db.add(global_settings)
+                db.commit()
+
+            # Expand template variables in blueprint schema
+            expander = TemplateExpander(global_settings, app.db_name)
+            expanded_schema = expander.expand_blueprint_schema(blueprint.schema_json)
+
+            # Apply defaults where user didn't provide values
+            complete_inputs = expander.apply_defaults_to_inputs(app_data["inputs"], expanded_schema)
+
             # Re-route inputs to schemas
             service_data, compose_data, metadata_data = _route_inputs_to_schemas(
-                app_data["inputs"],
-                blueprint
+                complete_inputs,
+                blueprint,
+                expanded_schema
             )
 
-            app.raw_inputs = app_data["inputs"]
+            app.raw_inputs = complete_inputs
             app.service_data = service_data
             app.compose_data = compose_data
             app.metadata_data = metadata_data
@@ -214,14 +245,17 @@ async def delete_app(app_id: int, db: Session = Depends(get_db)):
 
 def _route_inputs_to_schemas(
     inputs: Dict[str, Any],
-    blueprint: Blueprint
+    blueprint: Blueprint,
+    expanded_schema: Dict[str, Any]
 ) -> tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """
     Route user inputs to correct schemas based on blueprint field definitions.
+    Handles compound fields (type: "object") and routes them to the correct location.
 
     Args:
-        inputs: User's form inputs
+        inputs: User's form inputs (with defaults applied)
         blueprint: Blueprint with field schemas
+        expanded_schema: Expanded blueprint schema (with template variables resolved)
 
     Returns:
         Tuple of (service_data, compose_data, metadata_data)
@@ -231,7 +265,7 @@ def _route_inputs_to_schemas(
     metadata_data = {}
 
     for field_name, field_value in inputs.items():
-        field_schema = blueprint.schema_json.get(field_name)
+        field_schema = expanded_schema.get(field_name)
         if not field_schema:
             # Field not in blueprint, skip
             continue
@@ -254,25 +288,53 @@ def _route_inputs_to_schemas(
         if schema_type == 'env':
             continue
 
-        if schema_type == 'service':
-            if len(parts) > 1:
-                # Nested path like "service.environment.VAR_NAME"
-                _set_nested_value(service_data, parts[1], field_value)
-            else:
-                # Direct service field (shouldn't happen, but handle it)
-                service_data[field_name] = field_value
+        # Handle compound fields (type: "object")
+        # These are already structured objects, so we append them to arrays
+        field_type = field_schema.get('type')
+        if field_type == 'object' and isinstance(field_value, dict):
+            # Compound field like port_mapping or volume_mapping
+            # Route to the target as an array element
+            if schema_type == 'service':
+                if len(parts) > 1:
+                    target_path = parts[1]
+                    # Append to array (e.g., service.ports, service.volumes)
+                    _append_to_array(service_data, target_path, field_value)
+                else:
+                    service_data[field_name] = field_value
 
-        elif schema_type == 'compose':
-            if len(parts) > 1:
-                _set_nested_value(compose_data, parts[1], field_value)
-            else:
-                compose_data[field_name] = field_value
+            elif schema_type == 'compose':
+                if len(parts) > 1:
+                    _set_nested_value(compose_data, parts[1], field_value)
+                else:
+                    compose_data[field_name] = field_value
 
-        elif schema_type == 'metadata':
-            if len(parts) > 1:
-                _set_nested_value(metadata_data, parts[1], field_value)
-            else:
-                metadata_data[field_name] = field_value
+            elif schema_type == 'metadata':
+                if len(parts) > 1:
+                    _set_nested_value(metadata_data, parts[1], field_value)
+                else:
+                    metadata_data[field_name] = field_value
+
+        else:
+            # Regular field routing
+            if schema_type == 'service':
+                if len(parts) > 1:
+                    # Nested path like "service.environment.VAR_NAME"
+                    _set_nested_value(service_data, parts[1], field_value)
+                else:
+                    # Direct service field (shouldn't happen, but handle it)
+                    service_data[field_name] = field_value
+
+            elif schema_type == 'compose':
+                if len(parts) > 1:
+                    _set_nested_value(compose_data, parts[1], field_value)
+                else:
+                    compose_data[field_name] = field_value
+
+            elif schema_type == 'metadata':
+                if len(parts) > 1:
+                    _set_nested_value(metadata_data, parts[1], field_value)
+                else:
+                    metadata_data[field_name] = field_value
 
     return service_data, compose_data, metadata_data
 
@@ -300,3 +362,41 @@ def _set_nested_value(data: Dict[str, Any], path: str, value: Any):
     else:
         # Simple path
         data[path] = value
+
+
+def _append_to_array(data: Dict[str, Any], path: str, value: Any):
+    """
+    Append a value to an array at a nested path.
+    Creates the array if it doesn't exist.
+
+    Args:
+        data: Dictionary to modify
+        path: Dot-separated path (e.g., "ports" or "nested.array")
+        value: Value to append to the array
+    """
+    if '.' in path:
+        # Nested path
+        keys = path.split('.')
+        current = data
+
+        for key in keys[:-1]:
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+
+        # Ensure the target is an array
+        final_key = keys[-1]
+        if final_key not in current:
+            current[final_key] = []
+        elif not isinstance(current[final_key], list):
+            current[final_key] = [current[final_key]]
+
+        current[final_key].append(value)
+    else:
+        # Simple path
+        if path not in data:
+            data[path] = []
+        elif not isinstance(data[path], list):
+            data[path] = [data[path]]
+
+        data[path].append(value)
