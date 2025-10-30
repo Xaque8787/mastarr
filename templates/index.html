@@ -319,7 +319,8 @@
             color: #94a3b8;
         }
 
-        .array-item-field input {
+        .array-item-field input,
+        .array-item-field select {
             width: 100%;
             padding: 8px 10px;
             background: #0f172a;
@@ -327,6 +328,15 @@
             border-radius: 4px;
             color: #e2e8f0;
             font-size: 0.95rem;
+        }
+
+        .array-item-field select {
+            cursor: pointer;
+        }
+
+        .array-item-field select option {
+            background: #1e293b;
+            color: #e2e8f0;
         }
 
         .btn-remove {
@@ -611,11 +621,20 @@
                                             <template x-for="(itemField, itemFieldName) in field.item_schema" :key="itemFieldName">
                                                 <div class="array-item-field" x-show="!itemField.hidden">
                                                     <label x-text="itemField.label || itemFieldName"></label>
-                                                    <input
-                                                        :type="itemField.type === 'integer' ? 'number' : 'text'"
-                                                        :placeholder="itemField.placeholder || ''"
-                                                        x-model="formData[fieldName][index][itemFieldName]"
-                                                    >
+                                                    <template x-if="itemField.type === 'select'">
+                                                        <select x-model="formData[fieldName][index][itemFieldName]">
+                                                            <template x-for="option in itemField.options" :key="option.value">
+                                                                <option :value="option.value" x-text="option.label"></option>
+                                                            </template>
+                                                        </select>
+                                                    </template>
+                                                    <template x-if="itemField.type !== 'select'">
+                                                        <input
+                                                            :type="itemField.type === 'integer' ? 'number' : (itemField.type === 'boolean' ? 'checkbox' : 'text')"
+                                                            :placeholder="itemField.placeholder || ''"
+                                                            x-model="formData[fieldName][index][itemFieldName]"
+                                                        >
+                                                    </template>
                                                 </div>
                                             </template>
                                             <button type="button" class="btn-remove" @click="removeArrayItem(fieldName, index)">×</button>

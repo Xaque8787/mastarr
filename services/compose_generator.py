@@ -202,13 +202,39 @@ class ComposeGenerator:
 
                     for volume_item in user_value:
                         if isinstance(volume_item, dict) and 'source' in volume_item and 'target' in volume_item:
+                            volume_type = volume_item.get('type', 'bind')
+                            source = volume_item['source']
+
+                            # Apply HOST_PATH prepending for bind mounts with relative paths
+                            if volume_type == 'bind' and source.startswith('./'):
+                                source = f"${{HOST_PATH}}/{source[2:]}"
+
                             volume_dict = {
-                                "type": "bind",
-                                "source": volume_item['source'],
+                                "type": volume_type,
+                                "source": source,
                                 "target": volume_item['target'],
                                 "read_only": volume_item.get('read_only', False)
                             }
                             result['volumes'].append(volume_dict)
+
+            elif transform_type == 'network_config':
+                # Handle compound network configuration
+                if isinstance(user_value, dict):
+                    network_name = user_value.get('network_name')
+                    ipv4_address = user_value.get('ipv4_address')
+
+                    if network_name:
+                        if 'networks' not in result:
+                            result['networks'] = {}
+
+                        # Add network with optional IP configuration
+                        if ipv4_address:
+                            result['networks'][network_name] = {
+                                'ipv4_address': ipv4_address
+                            }
+                        else:
+                            # Network without specific config (use dict to allow merge)
+                            result['networks'][network_name] = {}
 
         # Handle custom environment variables (schema: "service.environment.*")
         for field_name, field_schema in blueprint.schema_json.items():

@@ -7,9 +7,6 @@
   "install_order": 1.0,
   "visible": true,
   "prerequisites": [],
-  "static_ips": {
-    "jellyfin": "10.21.12.3"
-  },
   "schema": {
     "image": {
       "type": "string",
@@ -215,10 +212,19 @@
       "visible": true,
       "advanced": true,
       "item_schema": {
+        "type": {
+          "type": "select",
+          "label": "Type",
+          "default": "bind",
+          "options": [
+            {"label": "Bind Mount", "value": "bind"},
+            {"label": "Named Volume", "value": "volume"}
+          ]
+        },
         "source": {
           "type": "string",
-          "label": "Host Path",
-          "placeholder": "/path/on/host"
+          "label": "Source",
+          "placeholder": "./data or volume_name"
         },
         "target": {
           "type": "string",
@@ -266,26 +272,28 @@
       "compose_transform": "port_array"
     },
     "service_network": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Network Name",
-      "default": "${GLOBAL.NETWORK_NAME}",
-      "description": "Docker network to attach to",
+      "type": "object",
+      "label": "Network Configuration",
+      "description": "Docker network settings for this container",
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.networks"
-    },
-    "ipv4_address": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Static IP Address",
-      "default": "10.21.12.3",
-      "description": "Static IPv4 address for this container",
-      "required": false,
-      "visible": true,
-      "advanced": true,
-      "schema": "service.network_config.${GLOBAL.NETWORK_NAME}.ipv4_address"
+      "fields": {
+        "network_name": {
+          "type": "string",
+          "label": "Network Name",
+          "default": "${GLOBAL.NETWORK_NAME}",
+          "placeholder": "mastarr_net"
+        },
+        "ipv4_address": {
+          "type": "string",
+          "label": "Static IP Address",
+          "default": "10.21.12.3",
+          "placeholder": "10.21.12.x"
+        }
+      },
+      "schema": "service.networks",
+      "compose_transform": "network_config"
     },
     "compose_network_mastarr": {
       "type": "string",
