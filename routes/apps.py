@@ -333,6 +333,14 @@ def _route_inputs_to_schemas(
 
             elif schema_type == 'compose':
                 if len(parts) > 1:
+                    # Special handling for JSON strings that need parsing
+                    if isinstance(field_value, str) and field_value.startswith('{'):
+                        try:
+                            import json
+                            field_value = json.loads(field_value)
+                        except:
+                            pass  # Keep as string if parsing fails
+
                     _set_nested_value(compose_data, parts[1], field_value)
                 else:
                     compose_data[field_name] = field_value

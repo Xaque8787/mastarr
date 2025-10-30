@@ -45,8 +45,8 @@ class ComposeGenerator:
         """
         logger.info(f"Generating compose for {app.name} ({blueprint.name})")
 
-        # Build service config (only dynamic transforms)
-        service_config = self._build_service_config(app)
+        # Build service config with transforms applied
+        service_config = self._build_service_config(app, blueprint)
 
         # Validate with Pydantic (this also transforms volumes/ports to proper format)
         service = ServiceSchema(**service_config)
@@ -62,14 +62,16 @@ class ComposeGenerator:
         logger.info(f"✓ Compose generated for {app.name}")
         return compose
 
-    def _build_service_config(self, app: App) -> Dict[str, Any]:
+    def _build_service_config(self, app: App, blueprint: Blueprint) -> Dict[str, Any]:
         """
-        Build service configuration from service_data.
-        Only applies truly dynamic transforms that cannot be defined in blueprints.
+        Build service configuration from service_data and apply compose_transforms.
         """
         service_config = app.service_data.copy() if app.service_data else {}
 
-        # ONLY dynamic transform: Append :${TAG:-latest} to image if no tag/variable present
+        # Apply compose_transform functions
+        service_config = self._apply_transforms(service_config, blueprint, app)
+
+        # Append :${TAG:-latest} to image if no tag/variable present
         if 'image' in service_config:
             image = service_config['image']
             # Don't add tag if already has : or $ (version or variable)
@@ -77,7 +79,6 @@ class ComposeGenerator:
                 service_config['image'] = f"{image}:${{TAG:-latest}}"
 
         # Transform network_config to proper networks format if present
-        # This handles the special case where we store network config separately
         network_config = service_config.pop('network_config', None)
         if network_config:
             # network_config format: {"mastarr_net": {"ipv4_address": "10.21.12.3"}}
@@ -99,6 +100,60 @@ class ComposeGenerator:
                         service_config['networks'][net_name] = net_conf
 
         return service_config
+
+    def _apply_transforms(
+        self,
+        service_data: Dict[str, Any],
+        blueprint: Blueprint,
+        app: App
+    ) -> Dict[str, Any]:
+        """Apply compose_transform functions to convert inputs to compose format"""
+        result = service_data.copy()
+        transform_cache = {}
+
+        for field_name, field_schema in blueprint.schema_json.items():
+            transform_type = field_schema.get('compose_transform')
+            if not transform_type:
+                continue
+
+            user_value = app.raw_inputs.get(field_name)
+            if user_value is None:
+                continue
+
+            if transform_type == 'port_mapping':
+                if 'port_mapping' not in transform_cache:
+                    host_port = app.raw_inputs.get('host_port')
+                    container_port = app.raw_inputs.get('container_port')
+
+                    if host_port and container_port:
+                        if 'ports' not in result:
+                            result['ports'] = []
+
+                        # Create port mapping dict
+                        port_dict = {
+                            "published": host_port,
+                            "target": container_port,
+                            "protocol": "tcp"
+                        }
+                        result['ports'].append(port_dict)
+                        transform_cache['port_mapping'] = True
+
+            elif transform_type == 'volume_mapping':
+                volume_target = field_schema.get('volume_target', '/data')
+
+                if 'volumes' not in result:
+                    result['volumes'] = []
+
+                # Create volume mapping dict
+                volume_dict = {
+                    "type": "bind",
+                    "source": user_value,
+                    "target": volume_target,
+                    "read_only": False
+                }
+                result['volumes'].append(volume_dict)
+
+        return result
 
 
     def generate_env_file(self, app_name: str, user_inputs: Dict[str, Any], blueprint: Blueprint) -> str:

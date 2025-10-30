@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from models.database import Blueprint, App, get_session
+from models.database import Blueprint, App, GlobalSettings, get_session
 from models.schemas import BlueprintResponse
 from utils.logger import get_logger
+from utils.template_expander import TemplateExpander
 
 logger = get_logger("mastarr.routes.blueprints")
 router = APIRouter(prefix="/api/blueprints", tags=["blueprints"])
@@ -47,20 +48,42 @@ async def get_blueprint(blueprint_name: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{blueprint_name}/schema")
-async def get_blueprint_schema(blueprint_name: str, db: Session = Depends(get_db)):
+async def get_blueprint_schema(
+    blueprint_name: str,
+    expand_templates: bool = True,
+    db: Session = Depends(get_db)
+):
     """
-    Get blueprint schema with prerequisites evaluated.
+    Get blueprint schema with prerequisites evaluated and templates expanded.
     Returns only fields that should be visible based on installed apps.
+
+    Args:
+        blueprint_name: Name of the blueprint
+        expand_templates: Whether to expand ${GLOBAL.*} template variables (default: True)
     """
     blueprint = db.query(Blueprint).filter(Blueprint.name == blueprint_name).first()
     if not blueprint:
         raise HTTPException(status_code=404, detail="Blueprint not found")
 
+    # Get global settings for template expansion
+    global_settings = db.query(GlobalSettings).first()
+    if not global_settings:
+        global_settings = GlobalSettings()
+        db.add(global_settings)
+        db.commit()
+
+    # Expand templates if requested
+    schema_to_use = blueprint.schema_json
+    if expand_templates:
+        # Use a placeholder app name for template expansion (real app name determined at creation)
+        expander = TemplateExpander(global_settings, blueprint_name)
+        schema_to_use = expander.expand_blueprint_schema(blueprint.schema_json)
+
     installed_apps = db.query(App).filter(App.status == "running").all()
 
     visible_schema = {}
 
-    for field_name, field in blueprint.schema_json.items():
+    for field_name, field in schema_to_use.items():
         if 'prerequisites' in field and field['prerequisites']:
             if not all(
                 check_prerequisite(prereq, installed_apps)

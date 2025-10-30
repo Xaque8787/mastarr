@@ -32,17 +32,21 @@
       "advanced": true,
       "schema": "env.TAG"
     },
+    "container_name": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Container Name",
+      "default": "jellyfin",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.container_name"
+    },
     "restart_policy": {
       "type": "string",
-      "ui_component": "dropdown",
+      "ui_component": "text",
       "label": "Restart Policy",
       "default": "unless-stopped",
-      "options": [
-        {"label": "No", "value": "no"},
-        {"label": "Always", "value": "always"},
-        {"label": "On Failure", "value": "on-failure"},
-        {"label": "Unless Stopped", "value": "unless-stopped"}
-      ],
       "required": false,
       "visible": true,
       "advanced": true,
@@ -81,149 +85,54 @@
       "advanced": true,
       "schema": "service.environment.TZ"
     },
-    "container_name": {
+    "host_port": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "Host Port",
+      "default": 8096,
+      "description": "Port on the host to access Jellyfin",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.ports",
+      "compose_transform": "port_mapping"
+    },
+    "container_port": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "Container Port",
+      "default": 8096,
+      "required": false,
+      "visible": false,
+      "advanced": false,
+      "schema": "service.ports",
+      "compose_transform": "port_mapping"
+    },
+    "config_path": {
       "type": "string",
       "ui_component": "text",
-      "label": "Container Name",
-      "default": "jellyfin",
+      "label": "Config Directory",
+      "default": "./config",
+      "description": "Path for configuration files (relative paths use HOST_PATH)",
       "required": false,
       "visible": true,
       "advanced": false,
-      "schema": "service.container_name"
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping",
+      "volume_target": "/config"
     },
-    "web_port": {
-      "type": "object",
-      "ui_component": "port_mapping",
-      "label": "Web Interface Port",
-      "description": "Port for accessing the Jellyfin web interface",
-      "default": {
-        "published": 8096,
-        "target": 8096,
-        "protocol": "tcp"
-      },
-      "fields": {
-        "published": {
-          "type": "integer",
-          "ui_component": "number",
-          "label": "Host Port",
-          "default": 8096
-        },
-        "target": {
-          "type": "integer",
-          "ui_component": "number",
-          "label": "Container Port",
-          "default": 8096
-        },
-        "protocol": {
-          "type": "string",
-          "ui_component": "dropdown",
-          "label": "Protocol",
-          "default": "tcp",
-          "options": [
-            {"label": "TCP", "value": "tcp"},
-            {"label": "UDP", "value": "udp"}
-          ]
-        }
-      },
-      "required": false,
-      "visible": true,
-      "advanced": false,
-      "schema": "service.ports"
-    },
-    "config_volume": {
-      "type": "object",
-      "ui_component": "volume_mapping",
-      "label": "Config Volume",
-      "description": "Storage location for Jellyfin configuration files",
-      "default": {
-        "type": "bind",
-        "source": "./config",
-        "target": "/config",
-        "read_only": false
-      },
-      "fields": {
-        "type": {
-          "type": "string",
-          "ui_component": "dropdown",
-          "label": "Type",
-          "default": "bind",
-          "options": [
-            {"label": "Bind Mount", "value": "bind"},
-            {"label": "Named Volume", "value": "volume"}
-          ]
-        },
-        "source": {
-          "type": "string",
-          "ui_component": "text",
-          "label": "Host Path",
-          "default": "./config",
-          "placeholder": "./config"
-        },
-        "target": {
-          "type": "string",
-          "ui_component": "text",
-          "label": "Container Path",
-          "default": "/config",
-          "placeholder": "/config"
-        },
-        "read_only": {
-          "type": "boolean",
-          "ui_component": "checkbox",
-          "label": "Read Only",
-          "default": false
-        }
-      },
-      "required": false,
-      "visible": true,
-      "advanced": false,
-      "schema": "service.volumes"
-    },
-    "cache_volume": {
-      "type": "object",
-      "ui_component": "volume_mapping",
-      "label": "Cache Volume",
-      "default": {
-        "type": "bind",
-        "source": "./cache",
-        "target": "/cache",
-        "read_only": false
-      },
-      "fields": {
-        "type": {
-          "type": "string",
-          "ui_component": "dropdown",
-          "label": "Type",
-          "default": "bind",
-          "options": [
-            {"label": "Bind Mount", "value": "bind"},
-            {"label": "Named Volume", "value": "volume"}
-          ]
-        },
-        "source": {
-          "type": "string",
-          "ui_component": "text",
-          "label": "Host Path",
-          "default": "./cache",
-          "placeholder": "./cache"
-        },
-        "target": {
-          "type": "string",
-          "ui_component": "text",
-          "label": "Container Path",
-          "default": "/cache",
-          "placeholder": "/cache"
-        },
-        "read_only": {
-          "type": "boolean",
-          "ui_component": "checkbox",
-          "label": "Read Only",
-          "default": false
-        }
-      },
+    "cache_path": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Cache Directory",
+      "default": "./cache",
+      "description": "Path for cache files (relative paths use HOST_PATH)",
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.volumes"
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping",
+      "volume_target": "/cache"
     },
     "service_network": {
       "type": "string",
@@ -248,12 +157,10 @@
       "schema": "service.network_config.${GLOBAL.NETWORK_NAME}.ipv4_address"
     },
     "compose_network_mastarr": {
-      "type": "object",
+      "type": "string",
       "ui_component": "text",
-      "label": "Network Definition",
-      "default": {
-        "external": true
-      },
+      "label": "Network Definition (internal)",
+      "default": "{\"external\": true}",
       "required": false,
       "visible": false,
       "advanced": false,
