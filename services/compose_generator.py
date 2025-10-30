@@ -121,7 +121,20 @@ class ComposeGenerator:
                 continue
 
             if transform_type == 'port_mapping':
-                if 'port_mapping' not in transform_cache:
+                # Handle compound field (object with host/container/protocol)
+                if isinstance(user_value, dict) and 'host' in user_value and 'container' in user_value:
+                    if 'ports' not in result:
+                        result['ports'] = []
+
+                    port_dict = {
+                        "published": user_value['host'],
+                        "target": user_value['container'],
+                        "protocol": user_value.get('protocol', 'tcp')
+                    }
+                    result['ports'].append(port_dict)
+
+                # Legacy handling: separate host_port and container_port fields
+                elif 'port_mapping' not in transform_cache:
                     host_port = app.raw_inputs.get('host_port')
                     container_port = app.raw_inputs.get('container_port')
 
@@ -129,7 +142,6 @@ class ComposeGenerator:
                         if 'ports' not in result:
                             result['ports'] = []
 
-                        # Create port mapping dict
                         port_dict = {
                             "published": host_port,
                             "target": container_port,
@@ -138,20 +150,78 @@ class ComposeGenerator:
                         result['ports'].append(port_dict)
                         transform_cache['port_mapping'] = True
 
+            elif transform_type == 'port_array':
+                # Handle array of port mappings
+                if isinstance(user_value, list):
+                    if 'ports' not in result:
+                        result['ports'] = []
+
+                    for port_item in user_value:
+                        if isinstance(port_item, dict) and 'host' in port_item and 'container' in port_item:
+                            port_dict = {
+                                "published": port_item['host'],
+                                "target": port_item['container'],
+                                "protocol": port_item.get('protocol', 'tcp')
+                            }
+                            result['ports'].append(port_dict)
+
             elif transform_type == 'volume_mapping':
-                volume_target = field_schema.get('volume_target', '/data')
+                # Handle compound field (object with source/target)
+                if isinstance(user_value, dict) and 'source' in user_value and 'target' in user_value:
+                    if 'volumes' not in result:
+                        result['volumes'] = []
 
-                if 'volumes' not in result:
-                    result['volumes'] = []
+                    volume_dict = {
+                        "type": "bind",
+                        "source": user_value['source'],
+                        "target": user_value['target'],
+                        "read_only": user_value.get('read_only', False)
+                    }
+                    result['volumes'].append(volume_dict)
 
-                # Create volume mapping dict
-                volume_dict = {
-                    "type": "bind",
-                    "source": user_value,
-                    "target": volume_target,
-                    "read_only": False
-                }
-                result['volumes'].append(volume_dict)
+                # Legacy handling: volume_target from field_schema
+                elif isinstance(user_value, str):
+                    volume_target = field_schema.get('volume_target', '/data')
+
+                    if 'volumes' not in result:
+                        result['volumes'] = []
+
+                    volume_dict = {
+                        "type": "bind",
+                        "source": user_value,
+                        "target": volume_target,
+                        "read_only": False
+                    }
+                    result['volumes'].append(volume_dict)
+
+            elif transform_type == 'volume_array':
+                # Handle array of volume mappings
+                if isinstance(user_value, list):
+                    if 'volumes' not in result:
+                        result['volumes'] = []
+
+                    for volume_item in user_value:
+                        if isinstance(volume_item, dict) and 'source' in volume_item and 'target' in volume_item:
+                            volume_dict = {
+                                "type": "bind",
+                                "source": volume_item['source'],
+                                "target": volume_item['target'],
+                                "read_only": volume_item.get('read_only', False)
+                            }
+                            result['volumes'].append(volume_dict)
+
+        # Handle custom environment variables (schema: "service.environment.*")
+        for field_name, field_schema in blueprint.schema_json.items():
+            schema_path = field_schema.get('schema', '')
+            if schema_path == 'service.environment.*':
+                user_value = app.raw_inputs.get(field_name)
+                if isinstance(user_value, list):
+                    if 'environment' not in result:
+                        result['environment'] = {}
+
+                    for item in user_value:
+                        if isinstance(item, dict) and 'key' in item and 'value' in item:
+                            result['environment'][item['key']] = item['value']
 
         return result
 

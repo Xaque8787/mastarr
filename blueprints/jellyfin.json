@@ -52,6 +52,115 @@
       "advanced": true,
       "schema": "service.restart"
     },
+    "admin_user": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Admin Username",
+      "placeholder": "Enter a username for the Admin user",
+      "required": true,
+      "visible": true,
+      "advanced": false,
+      "schema": "metadata.admin_user"
+    },
+    "admin_password": {
+      "type": "string",
+      "ui_component": "password",
+      "label": "Admin Password",
+      "placeholder": "Enter a password for the Admin user",
+      "required": true,
+      "visible": true,
+      "advanced": false,
+      "is_sensitive": true,
+      "schema": "metadata.admin_password"
+    },
+    "enable_transcoding": {
+      "type": "boolean",
+      "ui_component": "checkbox",
+      "label": "Enable Hardware Transcoding",
+      "default": false,
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "metadata.enable_transcoding"
+    },
+    "web_port": {
+      "type": "object",
+      "label": "Web Port",
+      "description": "HTTP port for accessing Jellyfin",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "fields": {
+        "host": {
+          "type": "integer",
+          "label": "Host Port",
+          "default": 8096,
+          "placeholder": "8096"
+        },
+        "container": {
+          "type": "integer",
+          "label": "Container Port",
+          "default": 8096,
+          "placeholder": "8096"
+        },
+        "protocol": {
+          "type": "string",
+          "label": "Protocol",
+          "default": "tcp",
+          "hidden": true
+        }
+      },
+      "schema": "service.ports",
+      "compose_transform": "port_mapping"
+    },
+    "config_volume": {
+      "type": "object",
+      "label": "Config Volume",
+      "description": "Path for configuration files",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "fields": {
+        "source": {
+          "type": "string",
+          "label": "Host Path",
+          "default": "./config",
+          "placeholder": "./config"
+        },
+        "target": {
+          "type": "string",
+          "label": "Container Path",
+          "default": "/config",
+          "hidden": true
+        }
+      },
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping"
+    },
+    "cache_volume": {
+      "type": "object",
+      "label": "Cache Volume",
+      "description": "Path for cache files",
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "fields": {
+        "source": {
+          "type": "string",
+          "label": "Host Path",
+          "default": "./cache",
+          "placeholder": "./cache"
+        },
+        "target": {
+          "type": "string",
+          "label": "Container Path",
+          "default": "/cache",
+          "hidden": true
+        }
+      },
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping"
+    },
     "puid_env": {
       "type": "integer",
       "ui_component": "number",
@@ -85,54 +194,76 @@
       "advanced": true,
       "schema": "service.environment.TZ"
     },
-    "host_port": {
-      "type": "integer",
-      "ui_component": "number",
-      "label": "Host Port",
-      "default": 8096,
-      "description": "Port on the host to access Jellyfin",
-      "required": false,
-      "visible": true,
-      "advanced": false,
-      "schema": "service.ports",
-      "compose_transform": "port_mapping"
-    },
-    "container_port": {
-      "type": "integer",
-      "ui_component": "number",
-      "label": "Container Port",
-      "default": 8096,
-      "required": false,
-      "visible": false,
-      "advanced": false,
-      "schema": "service.ports",
-      "compose_transform": "port_mapping"
-    },
-    "config_path": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Config Directory",
-      "default": "./config",
-      "description": "Path for configuration files (relative paths use HOST_PATH)",
-      "required": false,
-      "visible": true,
-      "advanced": false,
-      "schema": "service.volumes",
-      "compose_transform": "volume_mapping",
-      "volume_target": "/config"
-    },
-    "cache_path": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Cache Directory",
-      "default": "./cache",
-      "description": "Path for cache files (relative paths use HOST_PATH)",
+    "custom_environment": {
+      "type": "array",
+      "ui_component": "key_value_pairs",
+      "label": "Custom Environment Variables",
+      "description": "Add custom environment variables",
+      "default": [],
       "required": false,
       "visible": true,
       "advanced": true,
+      "schema": "service.environment.*"
+    },
+    "custom_volumes": {
+      "type": "array",
+      "ui_component": "volume_mapping",
+      "label": "Additional Volumes",
+      "description": "Add additional volume mappings",
+      "default": [],
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "item_schema": {
+        "source": {
+          "type": "string",
+          "label": "Host Path",
+          "placeholder": "/path/on/host"
+        },
+        "target": {
+          "type": "string",
+          "label": "Container Path",
+          "placeholder": "/path/in/container"
+        },
+        "read_only": {
+          "type": "boolean",
+          "label": "Read Only",
+          "default": false,
+          "hidden": true
+        }
+      },
       "schema": "service.volumes",
-      "compose_transform": "volume_mapping",
-      "volume_target": "/cache"
+      "compose_transform": "volume_array"
+    },
+    "custom_ports": {
+      "type": "array",
+      "ui_component": "port_mapping",
+      "label": "Additional Ports",
+      "description": "Add additional port mappings",
+      "default": [],
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "item_schema": {
+        "host": {
+          "type": "integer",
+          "label": "Host Port",
+          "placeholder": "8080"
+        },
+        "container": {
+          "type": "integer",
+          "label": "Container Port",
+          "placeholder": "8080"
+        },
+        "protocol": {
+          "type": "string",
+          "label": "Protocol",
+          "default": "tcp",
+          "hidden": true
+        }
+      },
+      "schema": "service.ports",
+      "compose_transform": "port_array"
     },
     "service_network": {
       "type": "string",
@@ -165,37 +296,6 @@
       "visible": false,
       "advanced": false,
       "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
-    },
-    "admin_user": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Admin Username",
-      "placeholder": "Enter a username for the Admin user",
-      "required": true,
-      "visible": true,
-      "advanced": false,
-      "schema": "metadata.admin_user"
-    },
-    "admin_password": {
-      "type": "string",
-      "ui_component": "password",
-      "label": "Admin Password",
-      "placeholder": "Enter a password for the Admin user",
-      "required": true,
-      "visible": true,
-      "advanced": false,
-      "is_sensitive": true,
-      "schema": "metadata.admin_password"
-    },
-    "enable_transcoding": {
-      "type": "boolean",
-      "ui_component": "checkbox",
-      "label": "Enable Hardware Transcoding",
-      "default": false,
-      "required": false,
-      "visible": true,
-      "advanced": false,
-      "schema": "metadata.enable_transcoding"
     }
   },
   "post_install_hook": "jellyfin.post_install"

@@ -255,6 +255,116 @@
             cursor: pointer;
         }
 
+        .compound-field {
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 16px;
+            background: #0f172a;
+        }
+
+        .compound-field > label:first-child {
+            display: block;
+            margin-bottom: 12px;
+            color: #3b82f6;
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+
+        .sub-fields {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        }
+
+        .sub-field label {
+            font-size: 0.9rem;
+            color: #94a3b8;
+        }
+
+        .array-field {
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 16px;
+            background: #0f172a;
+        }
+
+        .array-field > label:first-child {
+            display: block;
+            margin-bottom: 12px;
+            color: #3b82f6;
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+
+        .array-item {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+            margin-bottom: 8px;
+            padding: 12px;
+            background: #1e293b;
+            border-radius: 6px;
+            border: 1px solid #334155;
+        }
+
+        .array-item-field {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .array-item-field label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        .array-item-field input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 4px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+        }
+
+        .btn-remove {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            height: 36px;
+        }
+
+        .btn-remove:hover {
+            background: #dc2626;
+        }
+
+        .btn-add {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 8px;
+        }
+
+        .btn-add:hover {
+            background: #059669;
+        }
+
+        .field-description {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
         .form-actions {
             display: flex;
             gap: 12px;
@@ -443,6 +553,80 @@
                                     <label :for="fieldName" x-text="field.label" style="margin: 0;"></label>
                                 </div>
                             </template>
+
+                            <!-- Compound Field (Object Type) -->
+                            <template x-if="field.type === 'object' && field.fields">
+                                <div class="compound-field">
+                                    <label x-text="field.label"></label>
+                                    <p class="field-description" x-show="field.description" x-text="field.description"></p>
+                                    <div class="sub-fields">
+                                        <template x-for="(subField, subFieldName) in field.fields" :key="subFieldName">
+                                            <div class="sub-field" x-show="!subField.hidden">
+                                                <label x-text="subField.label"></label>
+                                                <input
+                                                    :type="subField.type === 'integer' ? 'number' : (subField.type === 'boolean' ? 'checkbox' : 'text')"
+                                                    :placeholder="subField.placeholder || ''"
+                                                    x-model="formData[fieldName][subFieldName]"
+                                                >
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Array Field (Key-Value Pairs) -->
+                            <template x-if="field.type === 'array' && field.ui_component === 'key_value_pairs'">
+                                <div class="array-field">
+                                    <label x-text="field.label"></label>
+                                    <p class="field-description" x-show="field.description" x-text="field.description"></p>
+
+                                    <template x-for="(item, index) in formData[fieldName]" :key="index">
+                                        <div class="array-item">
+                                            <div class="array-item-field">
+                                                <label>Key</label>
+                                                <input type="text" x-model="item.key" placeholder="VARIABLE_NAME">
+                                            </div>
+                                            <div class="array-item-field">
+                                                <label>Value</label>
+                                                <input type="text" x-model="item.value" placeholder="value">
+                                            </div>
+                                            <button type="button" class="btn-remove" @click="removeArrayItem(fieldName, index)">×</button>
+                                        </div>
+                                    </template>
+
+                                    <button type="button" class="btn-add" @click="addArrayItem(fieldName, {key: '', value: ''})">
+                                        + Add <span x-text="field.label.replace(/s$/, '')"></span>
+                                    </button>
+                                </div>
+                            </template>
+
+                            <!-- Array Field (Port/Volume Mappings) -->
+                            <template x-if="field.type === 'array' && field.item_schema && field.ui_component !== 'key_value_pairs'">
+                                <div class="array-field">
+                                    <label x-text="field.label"></label>
+                                    <p class="field-description" x-show="field.description" x-text="field.description"></p>
+
+                                    <template x-for="(item, index) in formData[fieldName]" :key="index">
+                                        <div class="array-item">
+                                            <template x-for="(itemField, itemFieldName) in field.item_schema" :key="itemFieldName">
+                                                <div class="array-item-field" x-show="!itemField.hidden">
+                                                    <label x-text="itemField.label || itemFieldName"></label>
+                                                    <input
+                                                        :type="itemField.type === 'integer' ? 'number' : 'text'"
+                                                        :placeholder="itemField.placeholder || ''"
+                                                        x-model="formData[fieldName][index][itemFieldName]"
+                                                    >
+                                                </div>
+                                            </template>
+                                            <button type="button" class="btn-remove" @click="removeArrayItem(fieldName, index)">×</button>
+                                        </div>
+                                    </template>
+
+                                    <button type="button" class="btn-add" @click="addArrayItem(fieldName, createEmptyItem(field.item_schema))">
+                                        + Add <span x-text="field.label.replace(/s$/, '')"></span>
+                                    </button>
+                                </div>
+                            </template>
                         </div>
                     </template>
 
@@ -620,7 +804,21 @@
                         const schema = schemaData.schema || {};
                         Object.keys(schema).forEach(fieldName => {
                             const field = schema[fieldName];
-                            if (field.default !== undefined) {
+
+                            // Handle object types (compound fields)
+                            if (field.type === 'object' && field.fields) {
+                                this.formData[fieldName] = {};
+                                Object.keys(field.fields).forEach(subFieldName => {
+                                    const subField = field.fields[subFieldName];
+                                    this.formData[fieldName][subFieldName] = subField.default !== undefined ? subField.default : '';
+                                });
+                            }
+                            // Handle array types
+                            else if (field.type === 'array') {
+                                this.formData[fieldName] = field.default || [];
+                            }
+                            // Handle simple types
+                            else if (field.default !== undefined) {
                                 this.formData[fieldName] = field.default;
                             }
                         });
@@ -838,6 +1036,25 @@
                         console.error('Failed to delete app:', error);
                         alert('Error removing app');
                     }
+                },
+
+                addArrayItem(fieldName, item) {
+                    if (!this.formData[fieldName]) {
+                        this.formData[fieldName] = [];
+                    }
+                    this.formData[fieldName].push(item);
+                },
+
+                removeArrayItem(fieldName, index) {
+                    this.formData[fieldName].splice(index, 1);
+                },
+
+                createEmptyItem(itemSchema) {
+                    const item = {};
+                    Object.keys(itemSchema).forEach(key => {
+                        item[key] = itemSchema[key].default !== undefined ? itemSchema[key].default : '';
+                    });
+                    return item;
                 }
             };
         }
