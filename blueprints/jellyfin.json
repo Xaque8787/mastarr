@@ -32,16 +32,6 @@
       "advanced": true,
       "schema": "env.TAG"
     },
-    "container_name": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Container Name",
-      "default": "jellyfin",
-      "required": false,
-      "visible": true,
-      "advanced": false,
-      "schema": "service.container_name"
-    },
     "restart_policy": {
       "type": "string",
       "ui_component": "dropdown",
@@ -54,7 +44,7 @@
         {"label": "Unless Stopped", "value": "unless-stopped"}
       ],
       "required": false,
-      "visible": false,
+      "visible": true,
       "advanced": true,
       "schema": "service.restart"
     },
@@ -65,7 +55,7 @@
       "default": "${GLOBAL.PUID}",
       "description": "User ID for file permissions",
       "required": false,
-      "visible": false,
+      "visible": true,
       "advanced": true,
       "schema": "service.environment.PUID"
     },
@@ -76,7 +66,7 @@
       "default": "${GLOBAL.PGID}",
       "description": "Group ID for file permissions",
       "required": false,
-      "visible": false,
+      "visible": true,
       "advanced": true,
       "schema": "service.environment.PGID"
     },
@@ -87,14 +77,25 @@
       "default": "${GLOBAL.TIMEZONE}",
       "description": "Container timezone",
       "required": false,
-      "visible": false,
+      "visible": true,
       "advanced": true,
       "schema": "service.environment.TZ"
+    },
+    "container_name": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Container Name",
+      "default": "jellyfin",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.container_name"
     },
     "web_port": {
       "type": "object",
       "ui_component": "port_mapping",
       "label": "Web Interface Port",
+      "description": "Port for accessing the Jellyfin web interface",
       "default": {
         "published": 8096,
         "target": 8096,
@@ -133,6 +134,7 @@
       "type": "object",
       "ui_component": "volume_mapping",
       "label": "Config Volume",
+      "description": "Storage location for Jellyfin configuration files",
       "default": {
         "type": "bind",
         "source": "./config",
@@ -230,7 +232,7 @@
       "default": "${GLOBAL.NETWORK_NAME}",
       "description": "Docker network to attach to",
       "required": false,
-      "visible": false,
+      "visible": true,
       "advanced": true,
       "schema": "service.networks"
     },
@@ -241,7 +243,7 @@
       "default": "10.21.12.3",
       "description": "Static IPv4 address for this container",
       "required": false,
-      "visible": false,
+      "visible": true,
       "advanced": true,
       "schema": "service.network_config.${GLOBAL.NETWORK_NAME}.ipv4_address"
     },

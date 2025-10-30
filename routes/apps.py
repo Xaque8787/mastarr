@@ -318,8 +318,15 @@ def _route_inputs_to_schemas(
             # Regular field routing
             if schema_type == 'service':
                 if len(parts) > 1:
+                    target_path = parts[1]
+
+                    # Special handling for networks - must be a list
+                    if target_path == 'networks' and isinstance(field_value, str):
+                        # Convert string network name to list
+                        field_value = [field_value]
+
                     # Nested path like "service.environment.VAR_NAME"
-                    _set_nested_value(service_data, parts[1], field_value)
+                    _set_nested_value(service_data, target_path, field_value)
                 else:
                     # Direct service field (shouldn't happen, but handle it)
                     service_data[field_name] = field_value
