@@ -281,6 +281,26 @@
             color: #94a3b8;
         }
 
+        .sub-field input,
+        .sub-field select {
+            width: 100%;
+            padding: 8px 10px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+        }
+
+        .sub-field select {
+            cursor: pointer;
+        }
+
+        .sub-field select option {
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+
         .array-field {
             border: 1px solid #334155;
             border-radius: 8px;
@@ -298,13 +318,14 @@
 
         .array-item {
             display: flex;
-            gap: 8px;
-            align-items: flex-end;
+            flex-direction: column;
+            gap: 12px;
             margin-bottom: 8px;
             padding: 12px;
             background: #1e293b;
             border-radius: 6px;
             border: 1px solid #334155;
+            position: relative;
         }
 
         .array-item-field {
@@ -340,14 +361,22 @@
         }
 
         .btn-remove {
+            position: absolute;
+            top: 8px;
+            right: 8px;
             background: #ef4444;
             color: white;
             border: none;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9rem;
-            height: 36px;
+            font-size: 1.1rem;
+            line-height: 1;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .btn-remove:hover {
