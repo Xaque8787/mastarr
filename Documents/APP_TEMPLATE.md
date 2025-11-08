@@ -627,7 +627,9 @@ Converts compound field to volume mapping.
 {
   "config_volume": {
     "source": "./config",
-    "target": "/config"
+    "target": "/config",
+    "bind_propagation": "rprivate",
+    "bind_create_host_path": true
   }
 }
 ```
@@ -639,9 +641,16 @@ volumes:
     source: ${HOST_PATH}/config
     target: /config
     read_only: false
+    bind:
+      propagation: rprivate
+      create_host_path: true
 ```
 
 **Note:** Automatically prepends `${HOST_PATH}/` to relative paths starting with `./`
+
+**Advanced Bind Mount Options:**
+- `bind_propagation`: Mount propagation mode (rprivate, shared, slave, rshared, rslave)
+- `bind_create_host_path`: Create directory on host if it doesn't exist (default: true)
 
 **Legacy Support:** Also works with single `source` string and `volume_target` property.
 
@@ -653,8 +662,18 @@ Converts array of volume objects to volume mappings.
 ```json
 {
   "custom_volumes": [
-    {"type": "bind", "source": "./media", "target": "/media"},
-    {"type": "volume", "source": "app_data", "target": "/data"}
+    {
+      "type": "bind",
+      "source": "./media",
+      "target": "/media",
+      "bind_propagation": "shared",
+      "bind_create_host_path": true
+    },
+    {
+      "type": "volume",
+      "source": "app_data",
+      "target": "/data"
+    }
   ]
 }
 ```
@@ -666,6 +685,9 @@ volumes:
     source: ${HOST_PATH}/media
     target: /media
     read_only: false
+    bind:
+      propagation: shared
+      create_host_path: true
   - type: volume
     source: app_data
     target: /data
@@ -895,6 +917,29 @@ Expands to:
           "label": "Container Path",
           "default": "/config",
           "hidden": true
+        },
+        "bind_propagation": {
+          "type": "string",
+          "ui_component": "dropdown",
+          "label": "Bind Propagation",
+          "description": "Mount propagation mode",
+          "required": false,
+          "advanced": true,
+          "options": [
+            {"label": "Default (rprivate)", "value": ""},
+            {"label": "rprivate - Private, no sub-mount sharing", "value": "rprivate"},
+            {"label": "shared - Sub-mounts visible both ways", "value": "shared"},
+            {"label": "slave - Host sub-mounts visible in container", "value": "slave"},
+            {"label": "rshared - Shared with nested sub-mounts", "value": "rshared"},
+            {"label": "rslave - Slave with nested sub-mounts", "value": "rslave"}
+          ]
+        },
+        "bind_create_host_path": {
+          "type": "boolean",
+          "label": "Create Host Path",
+          "default": true,
+          "description": "Create directory on host if it doesn't exist",
+          "advanced": true
         }
       },
       "schema": "service.volumes",

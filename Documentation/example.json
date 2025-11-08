@@ -1,0 +1,353 @@
+{
+  "name": "example_app",
+  "display_name": "Example Application",
+  "description": "Comprehensive blueprint template with all standard Docker Compose configurations",
+  "category": "SYSTEM",
+  "icon_url": "/static/images/placeholder.png",
+  "install_order": 100.0,
+  "visible": true,
+  "prerequisites": [],
+  "schema": {
+    "image": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Docker Image",
+      "default": "namespace/imagename",
+      "description": "Docker image to use for this container",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.image"
+    },
+    "tag": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Image Tag",
+      "default": "latest",
+      "description": "Docker image tag/version to use",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "env.TAG"
+    },
+    "container_name": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Container Name",
+      "default": "example_app",
+      "description": "Name for the Docker container",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.container_name"
+    },
+    "restart_policy": {
+      "type": "string",
+      "ui_component": "dropdown",
+      "label": "Restart Policy",
+      "default": "unless-stopped",
+      "description": "Container restart behavior",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "options": [
+        {"label": "No", "value": "no"},
+        {"label": "Always", "value": "always"},
+        {"label": "On Failure", "value": "on-failure"},
+        {"label": "Unless Stopped", "value": "unless-stopped"}
+      ],
+      "schema": "service.restart"
+    },
+    "web_port": {
+      "type": "object",
+      "label": "Web Port",
+      "description": "HTTP port for accessing the application",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "fields": {
+        "host": {
+          "type": "integer",
+          "label": "Host Port",
+          "default": 8080,
+          "placeholder": "8080"
+        },
+        "container": {
+          "type": "integer",
+          "label": "Container Port",
+          "default": 8080,
+          "placeholder": "8080"
+        },
+        "protocol": {
+          "type": "string",
+          "label": "Protocol",
+          "default": "tcp",
+          "hidden": true
+        }
+      },
+      "schema": "service.ports",
+      "compose_transform": "port_mapping"
+    },
+    "config_volume": {
+      "type": "object",
+      "label": "Config Volume",
+      "description": "Path for configuration files",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "fields": {
+        "source": {
+          "type": "string",
+          "label": "Host Path",
+          "default": "./config",
+          "placeholder": "./config"
+        },
+        "target": {
+          "type": "string",
+          "label": "Container Path",
+          "default": "/config",
+          "hidden": true
+        },
+        "bind_propagation": {
+          "type": "string",
+          "ui_component": "dropdown",
+          "label": "Bind Propagation",
+          "description": "Mount propagation mode",
+          "required": false,
+          "advanced": true,
+          "options": [
+            {"label": "Default (rprivate)", "value": ""},
+            {"label": "rprivate - Private, no sub-mount sharing", "value": "rprivate"},
+            {"label": "shared - Sub-mounts visible both ways", "value": "shared"},
+            {"label": "slave - Host sub-mounts visible in container", "value": "slave"},
+            {"label": "rshared - Shared with nested sub-mounts", "value": "rshared"},
+            {"label": "rslave - Slave with nested sub-mounts", "value": "rslave"}
+          ]
+        },
+        "bind_create_host_path": {
+          "type": "boolean",
+          "label": "Create Host Path",
+          "default": true,
+          "description": "Create directory on host if it doesn't exist",
+          "advanced": true
+        }
+      },
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping"
+    },
+    "data_volume": {
+      "type": "object",
+      "label": "Data Volume",
+      "description": "Path for application data",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "fields": {
+        "source": {
+          "type": "string",
+          "label": "Host Path",
+          "default": "./data",
+          "placeholder": "./data"
+        },
+        "target": {
+          "type": "string",
+          "label": "Container Path",
+          "default": "/data",
+          "hidden": true
+        },
+        "bind_propagation": {
+          "type": "string",
+          "ui_component": "dropdown",
+          "label": "Bind Propagation",
+          "description": "Mount propagation mode",
+          "required": false,
+          "advanced": true,
+          "options": [
+            {"label": "Default (rprivate)", "value": ""},
+            {"label": "rprivate - Private, no sub-mount sharing", "value": "rprivate"},
+            {"label": "shared - Sub-mounts visible both ways", "value": "shared"},
+            {"label": "slave - Host sub-mounts visible in container", "value": "slave"},
+            {"label": "rshared - Shared with nested sub-mounts", "value": "rshared"},
+            {"label": "rslave - Slave with nested sub-mounts", "value": "rslave"}
+          ]
+        },
+        "bind_create_host_path": {
+          "type": "boolean",
+          "label": "Create Host Path",
+          "default": true,
+          "description": "Create directory on host if it doesn't exist",
+          "advanced": true
+        }
+      },
+      "schema": "service.volumes",
+      "compose_transform": "volume_mapping"
+    },
+    "puid_env": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "PUID",
+      "default": "${GLOBAL.PUID}",
+      "description": "User ID for file permissions",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.environment.PUID"
+    },
+    "pgid_env": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "PGID",
+      "default": "${GLOBAL.PGID}",
+      "description": "Group ID for file permissions",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.environment.PGID"
+    },
+    "tz_env": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Timezone",
+      "default": "${GLOBAL.TIMEZONE}",
+      "description": "Container timezone",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.environment.TZ"
+    },
+    "service_network": {
+      "type": "object",
+      "label": "Network Configuration",
+      "description": "Docker network settings for this container",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "fields": {
+        "network_name": {
+          "type": "string",
+          "label": "Network Name",
+          "default": "${GLOBAL.NETWORK_NAME}",
+          "placeholder": "mastarr_net"
+        },
+        "ipv4_address": {
+          "type": "string",
+          "label": "Static IP Address",
+          "default": "10.21.12.100",
+          "placeholder": "10.21.12.x"
+        }
+      },
+      "schema": "service.networks",
+      "compose_transform": "network_config"
+    },
+    "compose_network_mastarr": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Network Definition (internal)",
+      "default": "{\"external\": true}",
+      "required": false,
+      "visible": false,
+      "advanced": false,
+      "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
+    },
+    "custom_environment": {
+      "type": "array",
+      "ui_component": "key_value_pairs",
+      "label": "Custom Environment Variables",
+      "description": "Add custom environment variables",
+      "default": [],
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "schema": "service.environment.*"
+    },
+    "custom_volumes": {
+      "type": "array",
+      "ui_component": "volume_mapping",
+      "label": "Additional Volumes",
+      "description": "Add additional volume mappings",
+      "default": [],
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "item_schema": {
+        "type": {
+          "type": "select",
+          "label": "Type",
+          "default": "bind",
+          "options": [
+            {"label": "Bind Mount", "value": "bind"},
+            {"label": "Named Volume", "value": "volume"}
+          ]
+        },
+        "source": {
+          "type": "string",
+          "label": "Source",
+          "placeholder": "./data or volume_name"
+        },
+        "target": {
+          "type": "string",
+          "label": "Container Path",
+          "placeholder": "/path/in/container"
+        },
+        "read_only": {
+          "type": "boolean",
+          "label": "Read Only",
+          "default": false
+        },
+        "bind_propagation": {
+          "type": "string",
+          "ui_component": "dropdown",
+          "label": "Bind Propagation",
+          "description": "Mount propagation mode (bind mounts only)",
+          "required": false,
+          "options": [
+            {"label": "Default (rprivate)", "value": ""},
+            {"label": "rprivate - Private, no sub-mount sharing", "value": "rprivate"},
+            {"label": "shared - Sub-mounts visible both ways", "value": "shared"},
+            {"label": "slave - Host sub-mounts visible in container", "value": "slave"},
+            {"label": "rshared - Shared with nested sub-mounts", "value": "rshared"},
+            {"label": "rslave - Slave with nested sub-mounts", "value": "rslave"}
+          ]
+        },
+        "bind_create_host_path": {
+          "type": "boolean",
+          "label": "Create Host Path",
+          "default": true,
+          "description": "Create directory on host if missing (bind mounts only)"
+        }
+      },
+      "schema": "service.volumes",
+      "compose_transform": "volume_array"
+    },
+    "custom_ports": {
+      "type": "array",
+      "ui_component": "port_mapping",
+      "label": "Additional Ports",
+      "description": "Add additional port mappings",
+      "default": [],
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "item_schema": {
+        "host": {
+          "type": "integer",
+          "label": "Host Port",
+          "placeholder": "8080"
+        },
+        "container": {
+          "type": "integer",
+          "label": "Container Port",
+          "placeholder": "8080"
+        },
+        "protocol": {
+          "type": "string",
+          "label": "Protocol",
+          "default": "tcp",
+          "hidden": true
+        }
+      },
+      "schema": "service.ports",
+      "compose_transform": "port_array"
+    }
+  }
+}
