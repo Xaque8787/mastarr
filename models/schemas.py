@@ -356,7 +356,6 @@ class ServiceSchema(BaseModel):
 
 class ComposeSchema(BaseModel):
     """Docker compose file schema - top-level compose structure"""
-    version: str = "3.9"
     services: Dict[str, ServiceSchema]
     networks: Optional[Dict[str, Union[ComposeNetworkSchema, Any]]] = None
     volumes: Optional[Dict[str, Union[ComposeVolumeSchema, Any]]] = None

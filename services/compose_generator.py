@@ -54,7 +54,6 @@ class ComposeGenerator:
         # Build compose config from stored data
         compose_config = app.compose_data.copy() if app.compose_data else {}
         compose_config['services'] = {app.db_name: service}
-        compose_config['version'] = "3.9"
 
         # Validate complete compose structure
         compose = ComposeSchema(**compose_config)
