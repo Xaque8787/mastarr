@@ -292,7 +292,14 @@ class ComposeGenerator:
 
                     for item in user_value:
                         if isinstance(item, dict) and 'key' in item and 'value' in item:
-                            result['environment'][item['key']] = item['value']
+                            # Skip empty key-value pairs
+                            key = item['key']
+                            value = item['value']
+
+                            if not key or key == '':
+                                continue
+
+                            result['environment'][key] = value
 
         return result
 

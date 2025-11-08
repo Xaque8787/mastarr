@@ -166,24 +166,32 @@ class AppInstaller:
 
             generator.close()
 
-            try:
-                result = subprocess.run(
-                    [
-                        "docker", "compose",
-                        "--project-directory", str(stack_path),
-                        "-f", str(compose_path),
-                        "up", "-d"
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-                logger.info(f"✓ Docker containers started for {app.name}")
-                if result.stdout:
-                    logger.debug(f"Docker output: {result.stdout}")
-            except subprocess.CalledProcessError as e:
-                logger.error(f"Docker compose failed: {e.stderr}")
-                raise Exception(f"Failed to start containers: {e.stderr}")
+            # Check if dry-run mode is enabled
+            dry_run = os.getenv('DRY_RUN', 'false').lower() in ('true', '1', 'yes')
+
+            if dry_run:
+                logger.info(f"🔍 DRY RUN MODE: Skipping container startup for {app.name}")
+                logger.info(f"   Compose file written to: {compose_path}")
+                logger.info(f"   To actually start the container, set DRY_RUN=false in .env")
+            else:
+                try:
+                    result = subprocess.run(
+                        [
+                            "docker", "compose",
+                            "--project-directory", str(stack_path),
+                            "-f", str(compose_path),
+                            "up", "-d"
+                        ],
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    logger.info(f"✓ Docker containers started for {app.name}")
+                    if result.stdout:
+                        logger.debug(f"Docker output: {result.stdout}")
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Docker compose failed: {e.stderr}")
+                    raise Exception(f"Failed to start containers: {e.stderr}")
 
             app.status = "running"
             app.installed_at = datetime.utcnow()
