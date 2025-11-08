@@ -1,18 +1,56 @@
-# Bind Options Behavior Documentation
+# Empty Value Handling - System-Wide Documentation
 
-This document explains how bind mount options are handled and how empty values are excluded from the generated Docker Compose files.
+This document explains how empty, null, and unset values are excluded from the generated Docker Compose files across **ALL** schemas in the system.
 
 ---
 
 ## Overview
 
-Bind mount options (`propagation` and `create_host_path`) are now supported in volume definitions. The system automatically excludes empty, null, or unset values from the final compose file.
+**IMPORTANT:** This behavior is applied system-wide to ALL Docker Compose-related Pydantic schemas:
+- Volume schemas (bind, named, tmpfs)
+- Port schemas
+- Network schemas
+- Service schemas
+- Healthcheck, Device schemas
+- Top-level Compose schemas
+- Metadata schemas
+
+The system automatically excludes empty, null, or unset values from the final compose file using a two-layer approach.
+
+---
+
+## Schemas with `exclude_none = True`
+
+All Docker Compose-related Pydantic schemas have `exclude_none = True` configured:
+
+### Volume Schemas
+- **BindOptionsSchema** - Bind mount options (propagation, create_host_path)
+- **ServiceBindVolumeSchema** - Bind mount volumes
+- **ServiceNamedVolumeSchema** - Named Docker volumes
+- **ServiceTmpfsVolumeSchema** - Tmpfs volumes
+
+### Network Schemas
+- **ServiceNetworkConfigSchema** - Service network configuration
+- **ComposeNetworkSchema** - Top-level network definitions
+
+### Port & Device Schemas
+- **PortMappingSchema** - Port mappings
+- **DeviceSchema** - Device mappings for hardware access
+
+### Health & Dependencies
+- **HealthcheckSchema** - Container healthcheck configuration
+
+### Top-Level Schemas
+- **ServiceSchema** - Complete service definition (includes all above)
+- **ComposeSchema** - Top-level compose file structure
+- **ComposeVolumeSchema** - Top-level volume definitions
+- **MetadataSchema** - Application metadata (hooks, setup)
 
 ---
 
 ## Pydantic Schema Configuration
 
-### BindOptionsSchema
+### Example: BindOptionsSchema
 ```python
 class BindOptionsSchema(BaseModel):
     """Bind mount specific options"""
@@ -405,15 +443,69 @@ To verify the behavior:
 
 ## Summary
 
-The system uses a multi-layered approach to exclude empty values:
+The system uses a **multi-layered approach applied to ALL schemas** to exclude empty values:
 
-1. **Pydantic Config** - `exclude_none=True` removes None values
-2. **Transform Logic** - Only adds properties when they have meaningful values
-3. **Cleanup Function** - Recursively removes empty strings, dicts, and lists
-4. **Result** - Clean, minimal Docker Compose files with only necessary configuration
+### Layer 1: Pydantic Config
+**ALL** Docker Compose-related Pydantic schemas have `exclude_none = True` configured in their Config class.
 
-This ensures:
-- ✅ No clutter in compose files
-- ✅ Docker defaults are respected
-- ✅ Valid falsy values (0, False) are preserved when meaningful
-- ✅ Empty configurations don't break compose validation
+```python
+class Config:
+    exclude_none = True
+```
+
+This applies to:
+- ✅ All volume schemas (Bind, Named, Tmpfs)
+- ✅ Port mapping schemas
+- ✅ Network configuration schemas
+- ✅ Service schema (and all nested objects)
+- ✅ Healthcheck, Device schemas
+- ✅ Top-level Compose schema
+- ✅ Metadata schema
+
+### Layer 2: Transform Logic
+Transform functions only add properties when they have meaningful values:
+- Empty strings → not added
+- None values → not added
+- Only include `read_only: true` when explicitly true
+- Only create `bind` object if options exist
+
+### Layer 3: Cleanup Function
+`_clean_empty_values()` recursively removes:
+- Empty strings: `""`
+- Empty dictionaries: `{}`
+- Empty lists: `[]`
+
+**But preserves valid falsy values:**
+- `false` (boolean) - when meaningful
+- `0` (integer) - when meaningful
+
+### Result
+Clean, minimal Docker Compose files with only necessary configuration.
+
+## Benefits
+
+✅ **No clutter** - Compose files only contain meaningful values
+✅ **Docker defaults respected** - Don't override with unnecessary explicit values
+✅ **Validation friendly** - No empty objects that might confuse Docker
+✅ **Consistent behavior** - Same logic applied across ALL schemas
+✅ **Future-proof** - New schemas automatically benefit from this pattern
+✅ **Maintainable** - Easy to understand and debug
+
+## When Values Are Included
+
+Values are included in the final compose file when:
+
+1. **Non-null and non-empty** - Has actual content
+2. **Meaningful falsy values** - `false` for critical boolean flags, `0` for counts
+3. **Explicitly set by user** - User intentionally provided the value
+4. **Required by Docker** - Necessary for proper container operation
+
+## When Values Are Excluded
+
+Values are excluded from the final compose file when:
+
+1. **None/null** - Field not set by user
+2. **Empty string** - `""`
+3. **Empty dict** - `{}`
+4. **Empty list** - `[]`
+5. **Default falsy where Docker has defaults** - e.g., `read_only: false` (Docker defaults to false)

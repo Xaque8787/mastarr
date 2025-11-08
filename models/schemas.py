@@ -189,8 +189,11 @@ class ServiceNamedVolumeSchema(BaseModel):
     type: Literal["volume"] = "volume"
     source: str
     target: str
-    read_only: Optional[bool] = False
+    read_only: Optional[bool] = None
     volume: Optional[Dict[str, Any]] = None
+
+    class Config:
+        exclude_none = True
 
 
 class ServiceTmpfsVolumeSchema(BaseModel):
@@ -198,6 +201,9 @@ class ServiceTmpfsVolumeSchema(BaseModel):
     type: Literal["tmpfs"] = "tmpfs"
     target: str
     tmpfs: Optional[Dict[str, Any]] = None
+
+    class Config:
+        exclude_none = True
 
 
 class PortMappingSchema(BaseModel):
@@ -207,6 +213,9 @@ class PortMappingSchema(BaseModel):
     protocol: Literal["tcp", "udp"] = "tcp"
     mode: Optional[Literal["host", "ingress"]] = None
 
+    class Config:
+        exclude_none = True
+
 
 class ServiceNetworkConfigSchema(BaseModel):
     """Network configuration for a service"""
@@ -214,6 +223,9 @@ class ServiceNetworkConfigSchema(BaseModel):
     ipv6_address: Optional[str] = None
     aliases: Optional[List[str]] = None
     priority: Optional[int] = None
+
+    class Config:
+        exclude_none = True
 
 
 class ComposeNetworkSchema(BaseModel):
@@ -226,6 +238,9 @@ class ComposeNetworkSchema(BaseModel):
     attachable: Optional[bool] = None
     labels: Optional[Dict[str, str]] = None
 
+    class Config:
+        exclude_none = True
+
 
 class ComposeVolumeSchema(BaseModel):
     """Top-level volume definition in compose file"""
@@ -234,6 +249,9 @@ class ComposeVolumeSchema(BaseModel):
     external: Optional[bool] = None
     name: Optional[str] = None
     labels: Optional[Dict[str, str]] = None
+
+    class Config:
+        exclude_none = True
 
 
 class HealthcheckSchema(BaseModel):
@@ -244,12 +262,18 @@ class HealthcheckSchema(BaseModel):
     retries: Optional[int] = None
     start_period: Optional[str] = None
 
+    class Config:
+        exclude_none = True
+
 
 class DeviceSchema(BaseModel):
     """Device mapping for hardware access"""
     host_path: str
     container_path: str
-    permissions: Optional[str] = "rwm"
+    permissions: Optional[str] = None
+
+    class Config:
+        exclude_none = True
 
 
 class ServiceSchema(BaseModel):
@@ -327,6 +351,7 @@ class ServiceSchema(BaseModel):
 
     class Config:
         extra = "allow"  # Allow additional fields not defined in schema
+        exclude_none = True
 
 
 class ComposeSchema(BaseModel):
@@ -340,6 +365,7 @@ class ComposeSchema(BaseModel):
 
     class Config:
         extra = "allow"  # Allow additional top-level fields
+        exclude_none = True
 
 
 class MetadataSchema(BaseModel):
@@ -361,6 +387,7 @@ class MetadataSchema(BaseModel):
 
     class Config:
         extra = "allow"  # All app-specific fields go through extra (e.g., enable_transcoding, library_paths, etc.)
+        exclude_none = True
 
 
 # Allow recursive model for dependent_fields
