@@ -39,7 +39,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mastarr_secure_password}
       - POSTGRES_DB=${POSTGRES_DB:-mastarr}
       - PYTHONUNBUFFERED=1
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DRY_RUN=${DRY_RUN:-false}
     depends_on:
       postgres:
         condition: service_healthy
