@@ -158,6 +158,14 @@ class ComposeGenerator:
 
                     for port_item in user_value:
                         if isinstance(port_item, dict) and 'host' in port_item and 'container' in port_item:
+                            # Skip empty port mappings
+                            host = port_item['host']
+                            container = port_item['container']
+
+                            # Skip if either value is empty string or None
+                            if not host or not container or host == '' or container == '':
+                                continue
+
                             port_dict = {
                                 "published": port_item['host'],
                                 "target": port_item['container'],
@@ -217,8 +225,15 @@ class ComposeGenerator:
 
                     for volume_item in user_value:
                         if isinstance(volume_item, dict) and 'source' in volume_item and 'target' in volume_item:
-                            volume_type = volume_item.get('type', 'bind')
+                            # Skip empty volume mappings
                             source = volume_item['source']
+                            target = volume_item['target']
+
+                            # Skip if either value is empty string or None
+                            if not source or not target or source == '' or target == '':
+                                continue
+
+                            volume_type = volume_item.get('type', 'bind')
 
                             # Apply HOST_PATH prepending for bind mounts with relative paths
                             if volume_type == 'bind' and source.startswith('./'):
@@ -227,7 +242,7 @@ class ComposeGenerator:
                             volume_dict = {
                                 "type": volume_type,
                                 "source": source,
-                                "target": volume_item['target']
+                                "target": target
                             }
 
                             # Only add read_only if explicitly set to True
