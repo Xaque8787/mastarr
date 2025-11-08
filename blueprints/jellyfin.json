@@ -129,6 +129,20 @@
           "label": "Container Path",
           "default": "/config",
           "hidden": true
+        },
+        "bind_propagation": {
+          "type": "string",
+          "label": "Bind Propagation",
+          "placeholder": "Leave empty for default",
+          "description": "Propagation mode for bind mount",
+          "advanced": true
+        },
+        "bind_create_host_path": {
+          "type": "boolean",
+          "label": "Create Host Path",
+          "default": true,
+          "description": "Create directory on host if it doesn't exist",
+          "advanced": true
         }
       },
       "schema": "service.volumes",
@@ -153,6 +167,20 @@
           "label": "Container Path",
           "default": "/cache",
           "hidden": true
+        },
+        "bind_propagation": {
+          "type": "string",
+          "label": "Bind Propagation",
+          "placeholder": "Leave empty for default",
+          "description": "Propagation mode for bind mount",
+          "advanced": true
+        },
+        "bind_create_host_path": {
+          "type": "boolean",
+          "label": "Create Host Path",
+          "default": true,
+          "description": "Create directory on host if it doesn't exist",
+          "advanced": true
         }
       },
       "schema": "service.volumes",
@@ -234,8 +262,19 @@
         "read_only": {
           "type": "boolean",
           "label": "Read Only",
-          "default": false,
-          "hidden": true
+          "default": false
+        },
+        "bind_propagation": {
+          "type": "string",
+          "label": "Bind Propagation",
+          "placeholder": "Leave empty for default",
+          "description": "Propagation mode (bind mounts only)"
+        },
+        "bind_create_host_path": {
+          "type": "boolean",
+          "label": "Create Host Path",
+          "default": true,
+          "description": "Create directory on host if missing (bind mounts only)"
         }
       },
       "schema": "service.volumes",

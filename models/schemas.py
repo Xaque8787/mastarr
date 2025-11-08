@@ -150,6 +150,16 @@ class GlobalSettingsResponse(BaseModel):
         from_attributes = True
 
 
+class BindOptionsSchema(BaseModel):
+    """Bind mount specific options"""
+    propagation: Optional[Literal["shared", "slave", "private", "rshared", "rslave", "rprivate"]] = None
+    create_host_path: Optional[bool] = None
+
+    class Config:
+        # Exclude None values when serializing
+        exclude_none = True
+
+
 class ServiceBindVolumeSchema(BaseModel):
     """
     Long syntax for bind mount volumes.
@@ -158,8 +168,8 @@ class ServiceBindVolumeSchema(BaseModel):
     type: Literal["bind"] = "bind"
     source: str
     target: str
-    read_only: Optional[bool] = False
-    bind: Optional[Dict[str, Any]] = None
+    read_only: Optional[bool] = None
+    bind: Optional[BindOptionsSchema] = None
 
     @field_validator('source')
     @classmethod
@@ -168,6 +178,10 @@ class ServiceBindVolumeSchema(BaseModel):
         if v.startswith('./'):
             return f"${{HOST_PATH}}/{v[2:]}"
         return v
+
+    class Config:
+        # Exclude None values when serializing
+        exclude_none = True
 
 
 class ServiceNamedVolumeSchema(BaseModel):

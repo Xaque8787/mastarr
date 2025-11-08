@@ -172,11 +172,26 @@ class ComposeGenerator:
                         result['volumes'] = []
 
                     volume_dict = {
-                        "type": "bind",
+                        "type": user_value.get('type', 'bind'),
                         "source": user_value['source'],
-                        "target": user_value['target'],
-                        "read_only": user_value.get('read_only', False)
+                        "target": user_value['target']
                     }
+
+                    # Only add read_only if explicitly set to True
+                    if user_value.get('read_only'):
+                        volume_dict['read_only'] = True
+
+                    # Handle bind-specific options
+                    if volume_dict['type'] == 'bind':
+                        bind_options = {}
+                        if user_value.get('bind_propagation'):
+                            bind_options['propagation'] = user_value['bind_propagation']
+                        if 'bind_create_host_path' in user_value and user_value['bind_create_host_path'] is not None:
+                            bind_options['create_host_path'] = user_value['bind_create_host_path']
+
+                        if bind_options:
+                            volume_dict['bind'] = bind_options
+
                     result['volumes'].append(volume_dict)
 
                 # Legacy handling: volume_target from field_schema
@@ -212,9 +227,24 @@ class ComposeGenerator:
                             volume_dict = {
                                 "type": volume_type,
                                 "source": source,
-                                "target": volume_item['target'],
-                                "read_only": volume_item.get('read_only', False)
+                                "target": volume_item['target']
                             }
+
+                            # Only add read_only if explicitly set to True
+                            if volume_item.get('read_only'):
+                                volume_dict['read_only'] = True
+
+                            # Handle bind-specific options
+                            if volume_type == 'bind':
+                                bind_options = {}
+                                if volume_item.get('bind_propagation'):
+                                    bind_options['propagation'] = volume_item['bind_propagation']
+                                if 'bind_create_host_path' in volume_item and volume_item['bind_create_host_path'] is not None:
+                                    bind_options['create_host_path'] = volume_item['bind_create_host_path']
+
+                                if bind_options:
+                                    volume_dict['bind'] = bind_options
+
                             result['volumes'].append(volume_dict)
 
             elif transform_type == 'network_config':
@@ -326,6 +356,9 @@ class ComposeGenerator:
         """
         compose_dict = compose.model_dump(exclude_none=True)
 
+        # Remove empty strings, empty dicts, and empty lists recursively
+        compose_dict = self._clean_empty_values(compose_dict)
+
         if 'services' in compose_dict:
             for service_name, service_config in compose_dict['services'].items():
                 if 'environment' in service_config and isinstance(service_config['environment'], dict):
@@ -337,6 +370,38 @@ class ComposeGenerator:
             yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
 
         logger.info(f"✓ Compose file written to {output_path}")
+
+    def _clean_empty_values(self, data):
+        """
+        Recursively remove empty strings, empty dicts, and empty lists from data.
+        Keeps False and 0 as they are valid values.
+
+        Args:
+            data: Dictionary, list, or other value to clean
+
+        Returns:
+            Cleaned data structure
+        """
+        if isinstance(data, dict):
+            cleaned = {}
+            for key, value in data.items():
+                # Recursively clean nested structures
+                cleaned_value = self._clean_empty_values(value)
+
+                # Skip empty strings, empty dicts, empty lists
+                # But keep False and 0 as they are valid values
+                if cleaned_value == '' or \
+                   (isinstance(cleaned_value, dict) and len(cleaned_value) == 0) or \
+                   (isinstance(cleaned_value, list) and len(cleaned_value) == 0):
+                    continue
+
+                cleaned[key] = cleaned_value
+            return cleaned
+        elif isinstance(data, list):
+            # Clean each item in the list
+            return [self._clean_empty_values(item) for item in data if item not in ('', None)]
+        else:
+            return data
 
     def close(self):
         """Close database session"""

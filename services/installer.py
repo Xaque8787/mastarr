@@ -8,7 +8,7 @@ from pathlib import Path
 from python_on_whales import DockerClient
 from models.database import App, Blueprint, get_session
 from models.schemas import ComposeSchema
-from services.compose_generator import generate_compose
+from services.compose_generator import generate_compose, ComposeGenerator
 from hooks.base import HookContext, get_hook_executor
 from utils.logger import get_logger
 from utils.path_resolver import PathResolver
@@ -149,6 +149,9 @@ class AppInstaller:
 
             compose_dict = compose_obj.model_dump(exclude_none=True)
 
+            # Remove empty strings, empty dicts, and empty lists
+            compose_dict = self._clean_empty_values(compose_dict)
+
             if 'services' in compose_dict:
                 for service_name, service_config in compose_dict['services'].items():
                     if 'environment' in service_config and isinstance(service_config['environment'], dict):
@@ -261,6 +264,38 @@ class AppInstaller:
         """Fetch blueprints from database"""
         blueprints = self.db.query(Blueprint).filter(Blueprint.name.in_(names)).all()
         return {bp.name: bp for bp in blueprints}
+
+    def _clean_empty_values(self, data):
+        """
+        Recursively remove empty strings, empty dicts, and empty lists from data.
+        Keeps False and 0 as they are valid values.
+
+        Args:
+            data: Dictionary, list, or other value to clean
+
+        Returns:
+            Cleaned data structure
+        """
+        if isinstance(data, dict):
+            cleaned = {}
+            for key, value in data.items():
+                # Recursively clean nested structures
+                cleaned_value = self._clean_empty_values(value)
+
+                # Skip empty strings, empty dicts, empty lists
+                # But keep False and 0 as they are valid values
+                if cleaned_value == '' or \
+                   (isinstance(cleaned_value, dict) and len(cleaned_value) == 0) or \
+                   (isinstance(cleaned_value, list) and len(cleaned_value) == 0):
+                    continue
+
+                cleaned[key] = cleaned_value
+            return cleaned
+        elif isinstance(data, list):
+            # Clean each item in the list
+            return [self._clean_empty_values(item) for item in data if item not in ('', None)]
+        else:
+            return data
 
     def close(self):
         """Close database session"""
