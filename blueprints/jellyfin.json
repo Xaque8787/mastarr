@@ -132,10 +132,19 @@
         },
         "bind_propagation": {
           "type": "string",
+          "ui_component": "dropdown",
           "label": "Bind Propagation",
-          "placeholder": "Leave empty for default",
-          "description": "Propagation mode for bind mount",
-          "advanced": true
+          "description": "Mount propagation mode",
+          "required": false,
+          "advanced": true,
+          "options": [
+            {"label": "Default (rprivate)", "value": ""},
+            {"label": "rprivate - Private, no sub-mount sharing", "value": "rprivate"},
+            {"label": "shared - Sub-mounts visible both ways", "value": "shared"},
+            {"label": "slave - Host sub-mounts visible in container", "value": "slave"},
+            {"label": "rshared - Shared with nested sub-mounts", "value": "rshared"},
+            {"label": "rslave - Slave with nested sub-mounts", "value": "rslave"}
+          ]
         },
         "bind_create_host_path": {
           "type": "boolean",
@@ -170,10 +179,19 @@
         },
         "bind_propagation": {
           "type": "string",
+          "ui_component": "dropdown",
           "label": "Bind Propagation",
-          "placeholder": "Leave empty for default",
-          "description": "Propagation mode for bind mount",
-          "advanced": true
+          "description": "Mount propagation mode",
+          "required": false,
+          "advanced": true,
+          "options": [
+            {"label": "Default (rprivate)", "value": ""},
+            {"label": "rprivate - Private, no sub-mount sharing", "value": "rprivate"},
+            {"label": "shared - Sub-mounts visible both ways", "value": "shared"},
+            {"label": "slave - Host sub-mounts visible in container", "value": "slave"},
+            {"label": "rshared - Shared with nested sub-mounts", "value": "rshared"},
+            {"label": "rslave - Slave with nested sub-mounts", "value": "rslave"}
+          ]
         },
         "bind_create_host_path": {
           "type": "boolean",
@@ -266,9 +284,18 @@
         },
         "bind_propagation": {
           "type": "string",
+          "ui_component": "dropdown",
           "label": "Bind Propagation",
-          "placeholder": "Leave empty for default",
-          "description": "Propagation mode (bind mounts only)"
+          "description": "Mount propagation mode (bind mounts only)",
+          "required": false,
+          "options": [
+            {"label": "Default (rprivate)", "value": ""},
+            {"label": "rprivate - Private, no sub-mount sharing", "value": "rprivate"},
+            {"label": "shared - Sub-mounts visible both ways", "value": "shared"},
+            {"label": "slave - Host sub-mounts visible in container", "value": "slave"},
+            {"label": "rshared - Shared with nested sub-mounts", "value": "rshared"},
+            {"label": "rslave - Slave with nested sub-mounts", "value": "rslave"}
+          ]
         },
         "bind_create_host_path": {
           "type": "boolean",

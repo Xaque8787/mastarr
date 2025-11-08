@@ -271,9 +271,9 @@
         }
 
         .sub-fields {
-            display: grid;
+            display: flex;
+            flex-direction: column;
             gap: 12px;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
         }
 
         .sub-field label {
@@ -571,13 +571,27 @@
                                     <p class="field-description" x-show="field.description" x-text="field.description"></p>
                                     <div class="sub-fields">
                                         <template x-for="(subField, subFieldName) in field.fields" :key="subFieldName">
-                                            <div class="sub-field" x-show="!subField.hidden">
+                                            <div class="sub-field" x-show="!subField.hidden && (!subField.advanced || showAdvanced)">
                                                 <label x-text="subField.label"></label>
-                                                <input
-                                                    :type="subField.type === 'integer' ? 'number' : (subField.type === 'boolean' ? 'checkbox' : 'text')"
-                                                    :placeholder="subField.placeholder || ''"
-                                                    x-model="formData[fieldName][subFieldName]"
-                                                >
+                                                <p class="field-description" x-show="subField.description" x-text="subField.description" style="font-size: 0.85rem; margin-bottom: 6px;"></p>
+
+                                                <!-- Dropdown for sub-field -->
+                                                <template x-if="subField.ui_component === 'dropdown' && subField.options">
+                                                    <select x-model="formData[fieldName][subFieldName]">
+                                                        <template x-for="option in subField.options" :key="option.value">
+                                                            <option :value="option.value" x-text="option.label"></option>
+                                                        </template>
+                                                    </select>
+                                                </template>
+
+                                                <!-- Regular input for sub-field -->
+                                                <template x-if="!subField.ui_component || subField.ui_component !== 'dropdown'">
+                                                    <input
+                                                        :type="subField.type === 'integer' ? 'number' : (subField.type === 'boolean' ? 'checkbox' : 'text')"
+                                                        :placeholder="subField.placeholder || ''"
+                                                        x-model="formData[fieldName][subFieldName]"
+                                                    >
+                                                </template>
                                             </div>
                                         </template>
                                     </div>
@@ -619,16 +633,30 @@
                                     <template x-for="(item, index) in formData[fieldName]" :key="index">
                                         <div class="array-item">
                                             <template x-for="(itemField, itemFieldName) in field.item_schema" :key="itemFieldName">
-                                                <div class="array-item-field" x-show="!itemField.hidden">
+                                                <div class="array-item-field" x-show="!itemField.hidden && (!itemField.advanced || showAdvanced)">
                                                     <label x-text="itemField.label || itemFieldName"></label>
-                                                    <template x-if="itemField.type === 'select'">
+                                                    <p x-show="itemField.description" x-text="itemField.description" style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;"></p>
+
+                                                    <!-- Handle dropdown (ui_component) -->
+                                                    <template x-if="itemField.ui_component === 'dropdown' && itemField.options">
                                                         <select x-model="formData[fieldName][index][itemFieldName]">
                                                             <template x-for="option in itemField.options" :key="option.value">
                                                                 <option :value="option.value" x-text="option.label"></option>
                                                             </template>
                                                         </select>
                                                     </template>
-                                                    <template x-if="itemField.type !== 'select'">
+
+                                                    <!-- Handle select (type) - legacy support -->
+                                                    <template x-if="itemField.type === 'select' && itemField.ui_component !== 'dropdown'">
+                                                        <select x-model="formData[fieldName][index][itemFieldName]">
+                                                            <template x-for="option in itemField.options" :key="option.value">
+                                                                <option :value="option.value" x-text="option.label"></option>
+                                                            </template>
+                                                        </select>
+                                                    </template>
+
+                                                    <!-- Handle regular inputs -->
+                                                    <template x-if="itemField.type !== 'select' && itemField.ui_component !== 'dropdown'">
                                                         <input
                                                             :type="itemField.type === 'integer' ? 'number' : (itemField.type === 'boolean' ? 'checkbox' : 'text')"
                                                             :placeholder="itemField.placeholder || ''"
