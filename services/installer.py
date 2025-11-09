@@ -124,14 +124,32 @@ class AppInstaller:
         app_map = {app.blueprint_name: app for app in apps}
         return [app_map[name] for name in sorted_names]
 
-    async def install_single_app(self, app_id: int):
-        """Install a single app"""
+    async def install_single_app(self, app_id: int, is_initial_install: bool = None):
+        """
+        Install or start a single app.
+
+        Args:
+            app_id: ID of the app to install
+            is_initial_install: If True, runs install hooks. If False, runs start hooks.
+                               If None (default), determines based on app.installed_at
+        """
         from services.compose_generator import ComposeGenerator
 
         app = self.db.query(App).filter(App.id == app_id).one()
         blueprint = self.db.query(Blueprint).filter(Blueprint.name == app.blueprint_name).one()
 
-        logger.info(f"Installing {app.name} (blueprint: {app.blueprint_name})")
+        # Determine if this is the initial install or a subsequent start
+        if is_initial_install is None:
+            is_initial_install = app.installed_at is None
+
+        operation = "Installing" if is_initial_install else "Starting"
+        logger.info(f"{operation} {app.name} (blueprint: {app.blueprint_name})")
+
+        # Run pre-install or pre-start hook
+        if is_initial_install:
+            await self._execute_app_hook(app, blueprint, "pre_install")
+        else:
+            await self._execute_app_hook(app, blueprint, "pre_start")
 
         app.status = "installing"
         self.db.commit()
@@ -199,16 +217,21 @@ class AppInstaller:
                     raise Exception(f"Failed to start containers: {e.stderr}")
 
             app.status = "running"
-            app.installed_at = datetime.utcnow()
+            if is_initial_install:
+                app.installed_at = datetime.utcnow()
             app.compose_file_path = str(compose_path)
             self.db.commit()
 
-            await self._execute_app_hook(app, blueprint, "post_install")
+            # Run post-install or post-start hook
+            if is_initial_install:
+                await self._execute_app_hook(app, blueprint, "post_install")
+            else:
+                await self._execute_app_hook(app, blueprint, "post_start")
 
-            logger.info(f"✓ {app.name} installed successfully")
+            logger.info(f"✓ {app.name} {operation.lower()} successfully")
 
         except Exception as e:
-            logger.error(f"Installation failed for {app.name}: {e}", exc_info=True)
+            logger.error(f"{operation} failed for {app.name}: {e}", exc_info=True)
             app.status = "error"
             app.error_message = str(e)
             self.db.commit()

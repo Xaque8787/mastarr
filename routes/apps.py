@@ -7,6 +7,7 @@ from services.installer import AppInstaller
 from utils.logger import get_logger
 from utils.template_expander import TemplateExpander
 from utils.path_resolver import PathResolver
+from hooks.base import HookContext, get_hook_executor
 import subprocess
 import shutil
 from pathlib import Path
@@ -206,8 +207,19 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
     db.commit()
     db.refresh(app)
 
-    # If app was running, stop it, then reinstall with the new configuration
+    # If app was running, run update hooks and restart
     if was_running:
+        # Run pre-update hook
+        hook_context = HookContext(
+            app_id=app.id,
+            app_name=app.name,
+            blueprint_name=app.blueprint_name,
+            container_name=app.service_data.get('container_name', app.name),
+            app=app
+        )
+        hook_executor = get_hook_executor()
+        await hook_executor.execute_hook(app.blueprint_name, "pre_update", hook_context)
+
         path_resolver = PathResolver()
         stack_path = path_resolver.get_stack_path(app.db_name)
         compose_path = stack_path / "docker-compose.yml"
@@ -230,10 +242,10 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
             except subprocess.CalledProcessError as e:
                 logger.warning(f"Failed to stop containers before update: {e.stderr}")
 
-        # Reinstall with new configuration
+        # Reinstall with new configuration (using is_initial_install=False to avoid install hooks)
         installer = AppInstaller(db)
         try:
-            await installer.install_single_app(app_id)
+            await installer.install_single_app(app_id, is_initial_install=False)
             logger.info(f"Updated and restarted app: {app.name}")
         except Exception as e:
             logger.error(f"Failed to restart app after update: {e}", exc_info=True)
@@ -243,6 +255,9 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
             )
         finally:
             installer.close()
+
+        # Run post-update hook
+        await hook_executor.execute_hook(app.blueprint_name, "post_update", hook_context)
     else:
         logger.info(f"Updated app: {app.name} (not running, no restart needed)")
 
@@ -269,6 +284,17 @@ async def stop_app(app_id: int, db: Session = Depends(get_db)):
 
     if app.status != "running":
         raise HTTPException(status_code=400, detail="App is not running")
+
+    # Run pre-stop hook
+    hook_context = HookContext(
+        app_id=app.id,
+        app_name=app.name,
+        blueprint_name=app.blueprint_name,
+        container_name=app.service_data.get('container_name', app.name),
+        app=app
+    )
+    hook_executor = get_hook_executor()
+    await hook_executor.execute_hook(app.blueprint_name, "pre_stop", hook_context)
 
     try:
         # Get stack path and compose file
@@ -302,6 +328,9 @@ async def stop_app(app_id: int, db: Session = Depends(get_db)):
         app.status = "stopped"
         db.commit()
 
+        # Run post-stop hook
+        await hook_executor.execute_hook(app.blueprint_name, "post_stop", hook_context)
+
         return {"status": "success", "message": f"{app.name} stopped"}
 
     except subprocess.CalledProcessError as e:
@@ -321,6 +350,17 @@ async def delete_app(app_id: int, db: Session = Depends(get_db)):
     app = db.query(App).filter(App.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
+
+    # Run pre-remove hook
+    hook_context = HookContext(
+        app_id=app.id,
+        app_name=app.name,
+        blueprint_name=app.blueprint_name,
+        container_name=app.service_data.get('container_name', app.name),
+        app=app
+    )
+    hook_executor = get_hook_executor()
+    await hook_executor.execute_hook(app.blueprint_name, "pre_remove", hook_context)
 
     path_resolver = PathResolver()
     stack_path = path_resolver.get_stack_path(app.db_name)
@@ -363,6 +403,9 @@ async def delete_app(app_id: int, db: Session = Depends(get_db)):
     # Delete from database
     db.delete(app)
     db.commit()
+
+    # Run post-remove hook
+    await hook_executor.execute_hook(app.blueprint_name, "post_remove", hook_context)
 
     logger.info(f"Deleted app: {app.name}")
     return {"status": "success", "message": f"{app.name} deleted"}

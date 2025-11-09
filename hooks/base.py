@@ -42,15 +42,27 @@ class AppHook:
     Base class for app-specific hooks.
 
     App hooks should inherit from this and implement the methods they need.
+    Each hook is called at a specific point in the app's lifecycle.
     """
 
     def __init__(self, context: HookContext):
         self.context = context
         self.logger = get_logger(f"mastarr.hooks.{context.blueprint_name}")
 
+    async def pre_install(self):
+        """
+        Called before the app's container is created/started for the first time.
+
+        Use this to:
+        - Validate prerequisites
+        - Prepare directories or configuration files
+        - Check system requirements
+        """
+        self.logger.info(f"[PRE-INSTALL] This hook will run before {self.context.app_name} is installed")
+
     async def post_install(self):
         """
-        Called after the app's container starts successfully.
+        Called after the app's container starts successfully for the first time.
 
         Use this to:
         - Wait for app to be ready (health checks)
@@ -58,18 +70,95 @@ class AppHook:
         - Create default settings
         - Initialize databases
         """
-        pass
+        self.logger.info(f"[POST-INSTALL] This hook will run after {self.context.app_name} is installed")
 
-    async def pre_uninstall(self):
+    async def pre_update(self):
         """
-        Called before the app's container is stopped/removed.
+        Called before an app's configuration is updated.
+
+        Use this to:
+        - Backup current configuration
+        - Validate new configuration
+        - Notify dependent services
+        """
+        self.logger.info(f"[PRE-UPDATE] This hook will run before {self.context.app_name} is updated")
+
+    async def post_update(self):
+        """
+        Called after an app's configuration is updated and container restarted.
+
+        Use this to:
+        - Verify new configuration is working
+        - Update dependent services
+        - Clear caches
+        """
+        self.logger.info(f"[POST-UPDATE] This hook will run after {self.context.app_name} is updated")
+
+    async def pre_start(self):
+        """
+        Called before a stopped container is started.
+
+        Use this to:
+        - Verify dependencies are running
+        - Check disk space
+        - Prepare runtime environment
+        """
+        self.logger.info(f"[PRE-START] This hook will run before {self.context.app_name} is started")
+
+    async def post_start(self):
+        """
+        Called after a stopped container is started.
+
+        Use this to:
+        - Wait for app to be ready
+        - Reconnect to services
+        - Resume operations
+        """
+        self.logger.info(f"[POST-START] This hook will run after {self.context.app_name} is started")
+
+    async def pre_stop(self):
+        """
+        Called before a running container is stopped.
+
+        Use this to:
+        - Gracefully close connections
+        - Save state
+        - Notify dependent services
+        """
+        self.logger.info(f"[PRE-STOP] This hook will run before {self.context.app_name} is stopped")
+
+    async def post_stop(self):
+        """
+        Called after a container is stopped.
+
+        Use this to:
+        - Clean up temporary files
+        - Update monitoring systems
+        - Log the stop event
+        """
+        self.logger.info(f"[POST-STOP] This hook will run after {self.context.app_name} is stopped")
+
+    async def pre_remove(self):
+        """
+        Called before the app is completely removed.
 
         Use this to:
         - Backup data
-        - Clean up resources
-        - Notify other services
+        - Export configurations
+        - Notify administrators
         """
-        pass
+        self.logger.info(f"[PRE-REMOVE] This hook will run before {self.context.app_name} is removed")
+
+    async def post_remove(self):
+        """
+        Called after the app is removed.
+
+        Use this to:
+        - Clean up external resources
+        - Update dependent services
+        - Remove database entries in other systems
+        """
+        self.logger.info(f"[POST-REMOVE] This hook will run after {self.context.app_name} is removed")
 
     async def health_check(self) -> bool:
         """
@@ -79,14 +168,6 @@ class AppHook:
             True if app is healthy, False otherwise
         """
         return True
-
-    async def configure(self):
-        """
-        Additional configuration logic.
-
-        Called after post_install completes successfully.
-        """
-        pass
 
 
 class HookExecutor:
