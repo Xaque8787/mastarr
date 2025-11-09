@@ -160,7 +160,7 @@ async def batch_install_apps(
         installer.close()
 
 
-@router.put("/{app_id}", response_model=AppResponse)
+@router.put("/{app_id}")
 async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db)):
     """Update an app's configuration and restart if running"""
     app = db.query(App).filter(App.id == app_id).first()
@@ -247,7 +247,17 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
         logger.info(f"Updated app: {app.name} (not running, no restart needed)")
 
     db.refresh(app)
-    return app
+
+    # Return a simple success response instead of the full AppResponse
+    return {
+        "status": "success",
+        "message": f"{app.name} updated {'and restarted' if was_running else 'successfully'}",
+        "app": {
+            "id": app.id,
+            "name": app.name,
+            "status": app.status
+        }
+    }
 
 
 @router.post("/{app_id}/stop")

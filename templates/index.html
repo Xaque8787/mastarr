@@ -984,14 +984,20 @@
                             });
 
                             if (!updateResponse.ok) {
-                                const error = await updateResponse.json();
-                                throw new Error(error.detail || 'Failed to update app');
+                                const errorText = await updateResponse.text();
+                                let errorMessage = 'Failed to update app';
+                                try {
+                                    const errorJson = JSON.parse(errorText);
+                                    errorMessage = errorJson.detail || errorMessage;
+                                } catch (e) {
+                                    // If it's not JSON, use the text as-is
+                                    errorMessage = errorText || errorMessage;
+                                }
+                                throw new Error(errorMessage);
                             }
 
-                            const wasRunning = this.editingApp.status === 'running';
-                            this.installSuccess = wasRunning
-                                ? `${this.editingApp.name} updated and restarted successfully!`
-                                : `${this.editingApp.name} configuration updated!`;
+                            const result = await updateResponse.json();
+                            this.installSuccess = result.message || `${this.editingApp.name} updated successfully!`;
                         } else {
                             // Create new app with 'configured' status
                             const appName = this.formData.container_name || this.selectedBlueprint.display_name;
