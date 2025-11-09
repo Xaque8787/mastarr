@@ -30,10 +30,8 @@ class Blueprint(Base):
     # Field schema (JSON)
     schema_json = Column(JSON, nullable=False)
 
-    # Hooks
-    post_install_hook = Column(String)
-    pre_uninstall_hook = Column(String)
-    health_check_hook = Column(String)
+    # Note: Legacy hook columns (post_install_hook, pre_uninstall_hook, health_check_hook)
+    # remain in database but are unused. Hook system now uses file-based convention.
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, onupdate=datetime.utcnow)

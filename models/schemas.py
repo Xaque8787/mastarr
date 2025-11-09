@@ -86,19 +86,6 @@ class BlueprintSchema(BaseModel):
     # Field definitions
     schema: Dict[str, FieldSchema]
 
-    # Lifecycle Hooks
-    pre_install_hook: Optional[str] = None
-    post_install_hook: Optional[str] = None
-    pre_update_hook: Optional[str] = None
-    post_update_hook: Optional[str] = None
-    pre_start_hook: Optional[str] = None
-    post_start_hook: Optional[str] = None
-    pre_stop_hook: Optional[str] = None
-    post_stop_hook: Optional[str] = None
-    pre_remove_hook: Optional[str] = None
-    post_remove_hook: Optional[str] = None
-    health_check_hook: Optional[str] = None
-
 
 class AppCreate(BaseModel):
     """Request to create a new app instance"""

@@ -13,7 +13,8 @@ This document provides a comprehensive guide to creating blueprint JSON files fo
 5. [Schema Routing](#schema-routing)
 6. [Compose Transforms](#compose-transforms)
 7. [Template Variables](#template-variables)
-8. [Complete Examples](#complete-examples)
+8. [Lifecycle Hooks](#lifecycle-hooks)
+9. [Complete Examples](#complete-examples)
 
 ---
 
@@ -38,8 +39,7 @@ A blueprint JSON file defines how an application should be configured and deploy
       "label": "Field Label",
       "schema": "service.property"
     }
-  },
-  "post_install_hook": "optional.hook.name"
+  }
 }
 ```
 
@@ -98,19 +98,6 @@ A blueprint JSON file defines how an application should be configured and deploy
 - **Description**: List of app names that must be installed first
 - **Example**: `["prowlarr"]`
 - **Default**: `[]`
-
-#### `post_install_hook` (string, optional)
-- **Description**: Python function to run after installation
-- **Format**: `"module.function_name"`
-- **Example**: `"jellyfin.post_install"`
-
-#### `pre_uninstall_hook` (string, optional)
-- **Description**: Python function to run before uninstalling
-- **Format**: `"module.function_name"`
-
-#### `health_check_hook` (string, optional)
-- **Description**: Python function to check app health status
-- **Format**: `"module.function_name"`
 
 ---
 
@@ -826,6 +813,322 @@ Expands to:
 
 ---
 
+## Lifecycle Hooks
+
+Mastarr provides a comprehensive hook system that allows you to execute custom code at specific points in an application's lifecycle. Hooks are Python files located in the `hooks/<app_name>/` directory.
+
+### Available Hooks
+
+Ten lifecycle hooks are available:
+
+#### Installation Hooks
+- **`pre_install.py`** - Runs before app installation begins
+  - Use for: Validating prerequisites, creating required directories
+- **`post_install.py`** - Runs after app installation completes
+  - Use for: Initial configuration, API key generation, user creation
+
+#### Update Hooks
+- **`pre_update.py`** - Runs before configuration update
+  - Use for: Backing up current config, validating new settings
+- **`post_update.py`** - Runs after configuration update and restart
+  - Use for: Verifying new configuration, updating related settings
+
+#### Start Hooks
+- **`pre_start.py`** - Runs before container starts
+  - Use for: Pre-flight checks, environment preparation
+- **`post_start.py`** - Runs after container starts
+  - Use for: Health checks, initialization verification
+
+#### Stop Hooks
+- **`pre_stop.py`** - Runs before container stops
+  - Use for: Graceful shutdown tasks, saving state
+- **`post_stop.py`** - Runs after container stops
+  - Use for: Cleanup tasks, backup creation
+
+#### Remove Hooks
+- **`pre_remove.py`** - Runs before app is uninstalled
+  - Use for: Final backups, cleanup preparation
+- **`post_remove.py`** - Runs after app is uninstalled
+  - Use for: Removing orphaned data, final cleanup
+
+### Hook File Structure
+
+Hooks are organized by app name:
+
+```
+hooks/
+├── jellyfin/
+│   ├── __init__.py
+│   ├── pre_install.py
+│   ├── post_install.py
+│   ├── pre_update.py
+│   ├── post_update.py
+│   ├── pre_start.py
+│   ├── post_start.py
+│   ├── pre_stop.py
+│   ├── post_stop.py
+│   ├── pre_remove.py
+│   └── post_remove.py
+├── radarr/
+│   ├── __init__.py
+│   └── post_install.py
+└── sonarr/
+    ├── __init__.py
+    └── post_install.py
+```
+
+### Creating a Hook
+
+Each hook file should define an async `run()` function that accepts a `HookContext`:
+
+```python
+"""
+Post-install hook for MyApp.
+Runs after MyApp is installed and started.
+"""
+from hooks.base import HookContext
+from utils.logger import get_logger
+import httpx
+
+logger = get_logger("mastarr.hooks.myapp.post_install")
+
+
+async def run(context: HookContext):
+    """
+    Execute post-install tasks for MyApp.
+
+    Args:
+        context: Hook context with app info
+    """
+    logger.info("=" * 60)
+    logger.info("[POST-INSTALL] Setting up MyApp")
+    logger.info(f"App: {context.app_name}")
+    logger.info(f"Container: {context.container_name}")
+
+    # Access metadata from blueprint
+    if context.app and context.app.metadata_data:
+        admin_user = context.app.metadata_data.get("admin_user")
+        admin_password = context.app.metadata_data.get("admin_password")
+
+        # Wait for app to be ready
+        await wait_for_app_ready(context.container_name)
+
+        # Perform initial configuration
+        await configure_app(admin_user, admin_password)
+
+    logger.info("✓ MyApp setup complete")
+    logger.info("=" * 60)
+
+
+async def wait_for_app_ready(container_name: str, max_attempts: int = 30):
+    """Wait for app to respond to health checks."""
+    for attempt in range(max_attempts):
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"http://{container_name}:8080/health",
+                    timeout=5.0
+                )
+                if response.status_code == 200:
+                    logger.info(f"✓ {container_name} is ready")
+                    return
+        except Exception:
+            pass
+
+        logger.debug(f"Waiting for {container_name}... ({attempt + 1}/{max_attempts})")
+        await asyncio.sleep(2)
+
+    logger.warning(f"{container_name} did not become ready in time")
+
+
+async def configure_app(username: str, password: str):
+    """Configure app with initial settings."""
+    # Your configuration logic here
+    logger.info(f"Creating admin user: {username}")
+```
+
+### HookContext API
+
+The `HookContext` object provides access to app information:
+
+```python
+class HookContext:
+    app_id: int              # Database ID of the app
+    app_name: str            # Name of the app (e.g., "jellyfin")
+    blueprint_name: str      # Blueprint name (usually same as app_name)
+    container_name: str      # Docker container name
+    app: Optional[App]       # Full app database object (includes metadata_data)
+```
+
+**Accessing Metadata:**
+```python
+if context.app and context.app.metadata_data:
+    api_key = context.app.metadata_data.get("api_key")
+    admin_user = context.app.metadata_data.get("admin_user")
+```
+
+**Accessing Service Data:**
+```python
+if context.app and context.app.service_data:
+    image = context.app.service_data.get("image")
+    ports = context.app.service_data.get("ports", [])
+```
+
+### Hook Best Practices
+
+#### 1. Use Async Functions
+
+All hooks should be async:
+```python
+async def run(context: HookContext):
+    # Your code here
+```
+
+#### 2. Add Logging
+
+Provide clear feedback about what the hook is doing:
+```python
+logger.info("Starting configuration...")
+logger.info(f"✓ Created user: {username}")
+logger.warning("API key not provided, skipping setup")
+logger.error("Failed to connect to app", exc_info=True)
+```
+
+#### 3. Handle Errors Gracefully
+
+Don't let hooks crash the entire operation:
+```python
+try:
+    await configure_something()
+except Exception as e:
+    logger.error(f"Configuration failed: {e}")
+    # Decide: raise to stop process, or continue
+```
+
+#### 4. Wait for Services
+
+After containers start, wait for them to be ready:
+```python
+async def wait_for_ready(container_name: str):
+    for _ in range(30):
+        try:
+            async with httpx.AsyncClient() as client:
+                await client.get(f"http://{container_name}:8080")
+                return
+        except:
+            await asyncio.sleep(2)
+```
+
+#### 5. Use Metadata for Configuration
+
+Store user input in metadata and access it in hooks:
+```python
+# In blueprint:
+"admin_user": {
+  "type": "string",
+  "schema": "metadata.admin_user"
+}
+
+# In hook:
+admin_user = context.app.metadata_data.get("admin_user")
+```
+
+#### 6. Document Your Hooks
+
+Add clear docstrings explaining what the hook does:
+```python
+"""
+Post-install hook for Jellyfin.
+Creates initial admin user and configures media libraries.
+"""
+```
+
+### Hook Execution Flow
+
+Understanding when hooks run:
+
+#### Install Flow
+1. `pre_install` hook
+2. Generate docker-compose.yml
+3. Start containers (`docker compose up`)
+4. `pre_start` hook
+5. Containers start
+6. `post_start` hook
+7. `post_install` hook
+
+#### Update Flow
+1. `pre_update` hook
+2. Stop containers (`docker compose down`)
+3. Update configuration
+4. Regenerate docker-compose.yml
+5. Start containers (`docker compose up`)
+6. `pre_start` hook
+7. Containers start
+8. `post_start` hook
+9. `post_update` hook
+
+#### Start Flow
+1. `pre_start` hook
+2. Start containers (`docker compose up`)
+3. Containers start
+4. `post_start` hook
+
+#### Stop Flow
+1. `pre_stop` hook
+2. Stop containers (`docker compose down`)
+3. Containers stop
+4. `post_stop` hook
+
+#### Remove Flow
+1. `pre_remove` hook
+2. Stop containers (`docker compose down`)
+3. Remove stack directory
+4. Delete from database
+5. `post_remove` hook
+
+### Common Hook Patterns
+
+#### Pattern: Wait and Configure
+```python
+async def run(context: HookContext):
+    # Wait for app to be ready
+    await wait_for_ready(context.container_name)
+
+    # Perform configuration
+    await setup_config(context)
+```
+
+#### Pattern: API Integration
+```python
+async def run(context: HookContext):
+    api_key = context.app.metadata_data.get("api_key")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"http://{context.container_name}:7878/api/v3/settings",
+            headers={"X-Api-Key": api_key},
+            json={"setting": "value"}
+        )
+```
+
+#### Pattern: File Operations
+```python
+async def run(context: HookContext):
+    from utils.path_resolver import PathResolver
+
+    path_resolver = PathResolver()
+    stack_path = path_resolver.get_stack_path(context.app.db_name)
+    config_path = stack_path / "config" / "config.xml"
+
+    # Modify configuration file
+    if config_path.exists():
+        content = config_path.read_text()
+        # Modify content...
+        config_path.write_text(content)
+```
+
+---
+
 ## Complete Examples
 
 ### Example 1: Simple Media Server App
@@ -1020,8 +1323,7 @@ Expands to:
       "advanced": false,
       "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
     }
-  },
-  "post_install_hook": "jellyfin.post_install"
+  }
 }
 ```
 
@@ -1098,8 +1400,7 @@ Expands to:
       "required": true,
       "schema": "metadata.api_key"
     }
-  },
-  "post_install_hook": "radarr.post_install"
+  }
 }
 ```
 
@@ -1221,25 +1522,9 @@ To create a new transform:
 1. Add transform logic to `services/compose_generator.py` in `_apply_transforms()`
 2. Reference the transform name in blueprint: `"compose_transform": "my_transform"`
 
-### Creating Custom Hooks
+### Hook System Details
 
-Post-install hooks are Python functions in `hooks/<app_name>/`:
-
-```python
-# hooks/myapp/post_install.py
-from hooks.base import Hook
-
-class PostInstallHook(Hook):
-    def execute(self, app, blueprint, global_settings):
-        # Your logic here
-        self.logger.info(f"Running post-install for {app.name}")
-        return True
-```
-
-Reference in blueprint:
-```json
-"post_install_hook": "myapp.post_install"
-```
+Refer to the [Lifecycle Hooks](#lifecycle-hooks) section for complete documentation on creating and using hooks.
 
 ---
 
