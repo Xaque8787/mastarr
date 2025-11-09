@@ -205,20 +205,27 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
             app.metadata_data = metadata_data
 
     db.commit()
+
+    # Store app info before potential session changes
+    app_id_stored = app.id
+    app_name_stored = app.name
+    blueprint_name = app.blueprint_name
+    container_name = app.service_data.get('container_name', app.name)
+
     db.refresh(app)
 
     # If app was running, run update hooks and restart
     if was_running:
         # Run pre-update hook
         hook_context = HookContext(
-            app_id=app.id,
-            app_name=app.name,
-            blueprint_name=app.blueprint_name,
-            container_name=app.service_data.get('container_name', app.name),
+            app_id=app_id_stored,
+            app_name=app_name_stored,
+            blueprint_name=blueprint_name,
+            container_name=container_name,
             app=app
         )
         hook_executor = get_hook_executor()
-        await hook_executor.execute_hook(app.blueprint_name, "pre_update", hook_context)
+        await hook_executor.execute_hook(blueprint_name, "pre_update", hook_context)
 
         path_resolver = PathResolver()
         stack_path = path_resolver.get_stack_path(app.db_name)
@@ -238,15 +245,15 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
                     capture_output=True,
                     text=True
                 )
-                logger.info(f"Stopped {app.name} for update")
+                logger.info(f"Stopped {app_name_stored} for update")
             except subprocess.CalledProcessError as e:
                 logger.warning(f"Failed to stop containers before update: {e.stderr}")
 
         # Reinstall with new configuration (using is_initial_install=False to avoid install hooks)
         installer = AppInstaller(db)
         try:
-            await installer.install_single_app(app_id, is_initial_install=False)
-            logger.info(f"Updated and restarted app: {app.name}")
+            await installer.install_single_app(app_id_stored, is_initial_install=False)
+            logger.info(f"Updated and restarted app: {app_name_stored}")
         except Exception as e:
             logger.error(f"Failed to restart app after update: {e}", exc_info=True)
             raise HTTPException(
@@ -256,12 +263,19 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
         finally:
             installer.close()
 
-        # Run post-update hook
-        await hook_executor.execute_hook(app.blueprint_name, "post_update", hook_context)
+        # Run post-update hook (refresh context in case app was modified)
+        hook_context = HookContext(
+            app_id=app_id_stored,
+            app_name=app_name_stored,
+            blueprint_name=blueprint_name,
+            container_name=container_name
+        )
+        await hook_executor.execute_hook(blueprint_name, "post_update", hook_context)
     else:
-        logger.info(f"Updated app: {app.name} (not running, no restart needed)")
+        logger.info(f"Updated app: {app_name_stored} (not running, no restart needed)")
 
-    db.refresh(app)
+    # Re-fetch the app from database to get latest state
+    app = db.query(App).filter(App.id == app_id_stored).first()
 
     # Return a simple success response instead of the full AppResponse
     return {
