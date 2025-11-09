@@ -6,6 +6,10 @@ from models.schemas import AppCreate, AppResponse
 from services.installer import AppInstaller
 from utils.logger import get_logger
 from utils.template_expander import TemplateExpander
+from utils.path_resolver import PathResolver
+import subprocess
+import shutil
+from pathlib import Path
 
 logger = get_logger("mastarr.routes.apps")
 router = APIRouter(prefix="/api/apps", tags=["apps"])
@@ -158,10 +162,12 @@ async def batch_install_apps(
 
 @router.put("/{app_id}", response_model=AppResponse)
 async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db)):
-    """Update an app's configuration"""
+    """Update an app's configuration and restart if running"""
     app = db.query(App).filter(App.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
+
+    was_running = app.status == "running"
 
     # Update inputs if provided
     if "inputs" in app_data:
@@ -197,14 +203,50 @@ async def update_app(app_id: int, app_data: dict, db: Session = Depends(get_db))
             app.compose_data = compose_data
             app.metadata_data = metadata_data
 
-    # Update status to configured if it was running (requires reinstall)
-    if app.status == "running":
-        app.status = "configured"
-
     db.commit()
     db.refresh(app)
 
-    logger.info(f"Updated app: {app.name}")
+    # If app was running, stop it, then reinstall with the new configuration
+    if was_running:
+        path_resolver = PathResolver()
+        stack_path = path_resolver.get_stack_path(app.db_name)
+        compose_path = stack_path / "docker-compose.yml"
+
+        # Stop the existing containers
+        if compose_path.exists():
+            try:
+                result = subprocess.run(
+                    [
+                        "docker", "compose",
+                        "--project-directory", str(stack_path),
+                        "-f", str(compose_path),
+                        "down"
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                logger.info(f"Stopped {app.name} for update")
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Failed to stop containers before update: {e.stderr}")
+
+        # Reinstall with new configuration
+        installer = AppInstaller(db)
+        try:
+            await installer.install_single_app(app_id)
+            logger.info(f"Updated and restarted app: {app.name}")
+        except Exception as e:
+            logger.error(f"Failed to restart app after update: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Configuration updated but restart failed: {str(e)}"
+            )
+        finally:
+            installer.close()
+    else:
+        logger.info(f"Updated app: {app.name} (not running, no restart needed)")
+
+    db.refresh(app)
     return app
 
 
@@ -218,24 +260,97 @@ async def stop_app(app_id: int, db: Session = Depends(get_db)):
     if app.status != "running":
         raise HTTPException(status_code=400, detail="App is not running")
 
-    # TODO: Stop docker containers
-    # For now, just update status
-    app.status = "stopped"
-    db.commit()
+    try:
+        # Get stack path and compose file
+        path_resolver = PathResolver()
+        stack_path = path_resolver.get_stack_path(app.db_name)
+        compose_path = stack_path / "docker-compose.yml"
 
-    logger.info(f"Stopped app: {app.name}")
-    return {"status": "success", "message": f"{app.name} stopped"}
+        if not compose_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Compose file not found at {compose_path}"
+            )
+
+        # Run docker compose down
+        result = subprocess.run(
+            [
+                "docker", "compose",
+                "--project-directory", str(stack_path),
+                "-f", str(compose_path),
+                "down"
+            ],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+
+        logger.info(f"Stopped containers for {app.name}")
+        if result.stdout:
+            logger.debug(f"Docker output: {result.stdout}")
+
+        app.status = "stopped"
+        db.commit()
+
+        return {"status": "success", "message": f"{app.name} stopped"}
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Docker compose down failed: {e.stderr}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to stop containers: {e.stderr}"
+        )
+    except Exception as e:
+        logger.error(f"Stop failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{app_id}")
 async def delete_app(app_id: int, db: Session = Depends(get_db)):
-    """Delete an app (and stop its containers)"""
+    """Delete an app (stop containers, remove files, and delete from database)"""
     app = db.query(App).filter(App.id == app_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="App not found")
 
-    # TODO: Stop and remove docker containers
+    path_resolver = PathResolver()
+    stack_path = path_resolver.get_stack_path(app.db_name)
+    compose_path = stack_path / "docker-compose.yml"
 
+    # Stop containers if running
+    if app.status == "running" and compose_path.exists():
+        try:
+            result = subprocess.run(
+                [
+                    "docker", "compose",
+                    "--project-directory", str(stack_path),
+                    "-f", str(compose_path),
+                    "down"
+                ],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            logger.info(f"Stopped containers for {app.name} before removal")
+            if result.stdout:
+                logger.debug(f"Docker output: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to stop containers (continuing with removal): {e.stderr}")
+        except Exception as e:
+            logger.warning(f"Error stopping containers (continuing with removal): {e}")
+
+    # Remove stack directory
+    if stack_path.exists():
+        try:
+            shutil.rmtree(stack_path)
+            logger.info(f"Removed stack directory: {stack_path}")
+        except Exception as e:
+            logger.error(f"Failed to remove stack directory: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to remove stack directory: {str(e)}"
+            )
+
+    # Delete from database
     db.delete(app)
     db.commit()
 

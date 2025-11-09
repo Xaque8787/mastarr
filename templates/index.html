@@ -124,7 +124,7 @@
         }
 
         .status-configured {
-            background: #3b82f6;
+            background: #f59e0b;
             color: white;
         }
 
@@ -511,7 +511,7 @@
                             Category: <span x-text="blueprint.category"></span>
                         </p>
                         <button class="btn" @click="selectBlueprint(blueprint)">
-                            Configure & Install
+                            Configure
                         </button>
                     </div>
                 </template>
@@ -743,7 +743,7 @@
                                     'status-stopped': app.status === 'stopped',
                                     'status-error': app.status === 'error'
                                 }"
-                                x-text="app.status">
+                                x-text="app.status === 'configured' ? 'pending install' : app.status">
                             </span>
                         </h3>
                         <p><strong>Blueprint:</strong> <span x-text="app.blueprint_name"></span></p>
@@ -780,6 +780,13 @@
                                         Stop
                                     </button>
                                 </div>
+                            </template>
+
+                            <!-- Stopped state: Show Start button -->
+                            <template x-if="app.status === 'stopped'">
+                                <button class="btn btn-success btn-small" @click="installSingleApp(app.id)">
+                                    Start
+                                </button>
                             </template>
 
                             <!-- All states: Show Remove button -->
@@ -981,7 +988,10 @@
                                 throw new Error(error.detail || 'Failed to update app');
                             }
 
-                            this.installSuccess = `${this.editingApp.name} updated successfully!`;
+                            const wasRunning = this.editingApp.status === 'running';
+                            this.installSuccess = wasRunning
+                                ? `${this.editingApp.name} updated and restarted successfully!`
+                                : `${this.editingApp.name} configuration updated!`;
                         } else {
                             // Create new app with 'configured' status
                             const appName = this.formData.container_name || this.selectedBlueprint.display_name;
