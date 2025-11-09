@@ -371,6 +371,5 @@
       "advanced": false,
       "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
     }
-  },
-  "post_install_hook": "jellyfin.post_install"
+  }
 }
