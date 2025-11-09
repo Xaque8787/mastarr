@@ -27,6 +27,9 @@ services:
       - ./:/app
       - /var/run/docker.sock:/var/run/docker.sock
       - ./stacks:/stacks
+      # Uncomment the line below and change the path to use a custom location for your stacks
+      # Then comment out the "./stacks:/stacks" line above
+      # - /opt/stacks:/stacks
       - ./data:/app/data
       - ./logs:/app/logs
     environment:

@@ -141,9 +141,14 @@ class AppInstaller:
 
             compose_obj = generator.generate(app, blueprint)
 
+            # Container path for file operations
             stack_path = self.path_resolver.ensure_stack_directory(app.db_name)
             compose_path = stack_path / "docker-compose.yml"
             env_path = stack_path / ".env"
+
+            # Host path for docker compose command (resolves both relative and absolute mounts)
+            host_stack_path = self.path_resolver.get_host_stack_path(app.db_name)
+            host_compose_path = os.path.join(host_stack_path, "docker-compose.yml")
 
             generator.write_env_file(app.db_name, app.raw_inputs, blueprint, str(env_path))
 
@@ -175,11 +180,13 @@ class AppInstaller:
                 logger.info(f"   To actually start the container, set DRY_RUN=false in .env")
             else:
                 try:
+                    # Use host paths for docker compose command
+                    # This works whether the stacks mount is relative (./stacks) or absolute (/opt/stacks)
                     result = subprocess.run(
                         [
                             "docker", "compose",
-                            "--project-directory", str(stack_path),
-                            "-f", str(compose_path),
+                            "--project-directory", host_stack_path,
+                            "-f", host_compose_path,
                             "up", "-d"
                         ],
                         check=True,
