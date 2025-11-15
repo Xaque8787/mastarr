@@ -208,34 +208,40 @@
       "type": "integer",
       "ui_component": "number",
       "label": "PUID",
-      "default": "${GLOBAL.PUID}",
+      "default": null,
+      "placeholder": "Leave blank to use global setting",
       "description": "User ID for file permissions",
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.environment.PUID"
+      "schema": "service.environment.PUID",
+      "use_global": "PUID"
     },
     "pgid_env": {
       "type": "integer",
       "ui_component": "number",
       "label": "PGID",
-      "default": "${GLOBAL.PGID}",
+      "default": null,
+      "placeholder": "Leave blank to use global setting",
       "description": "Group ID for file permissions",
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.environment.PGID"
+      "schema": "service.environment.PGID",
+      "use_global": "PGID"
     },
     "tz_env": {
       "type": "string",
       "ui_component": "text",
       "label": "Timezone",
-      "default": "${GLOBAL.TIMEZONE}",
+      "default": null,
+      "placeholder": "Leave blank to use global setting",
       "description": "Container timezone",
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.environment.TZ"
+      "schema": "service.environment.TZ",
+      "use_global": "TZ"
     },
     "custom_environment": {
       "type": "array",

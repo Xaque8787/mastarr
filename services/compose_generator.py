@@ -45,8 +45,11 @@ class ComposeGenerator:
         """
         logger.info(f"Generating compose for {app.name} ({blueprint.name})")
 
-        # Build service config with transforms applied
-        service_config = self._build_service_config(app, blueprint)
+        # Get global settings for fallback values
+        global_settings = self.db.query(GlobalSettings).first()
+
+        # Build service config with transforms and globals applied
+        service_config = self._build_service_config(app, blueprint, global_settings)
 
         # Validate with Pydantic (this also transforms volumes/ports to proper format)
         service = ServiceSchema(**service_config)
@@ -61,11 +64,15 @@ class ComposeGenerator:
         logger.info(f"✓ Compose generated for {app.name}")
         return compose
 
-    def _build_service_config(self, app: App, blueprint: Blueprint) -> Dict[str, Any]:
+    def _build_service_config(self, app: App, blueprint: Blueprint, global_settings: GlobalSettings) -> Dict[str, Any]:
         """
         Build service configuration from service_data and apply compose_transforms.
+        Injects global values for fields that support use_global and are not present in service_data.
         """
         service_config = app.service_data.copy() if app.service_data else {}
+
+        # Inject global values for missing fields that support use_global
+        service_config = self._inject_global_values(service_config, blueprint, global_settings)
 
         # Apply compose_transform functions
         service_config = self._apply_transforms(service_config, blueprint, app)
@@ -99,6 +106,72 @@ class ComposeGenerator:
                         service_config['networks'][net_name] = net_conf
 
         return service_config
+
+    def _inject_global_values(
+        self,
+        service_config: Dict[str, Any],
+        blueprint: Blueprint,
+        global_settings: GlobalSettings
+    ) -> Dict[str, Any]:
+        """
+        Inject global values for fields that have use_global set and are missing from service_config.
+
+        Args:
+            service_config: Service configuration dict
+            blueprint: Blueprint definition with field schemas
+            global_settings: Global settings to use for injection
+
+        Returns:
+            Updated service_config with global values injected
+        """
+        result = service_config.copy()
+
+        # Build mapping of global keys to values
+        global_mapping = {
+            "PUID": global_settings.puid,
+            "PGID": global_settings.pgid,
+            "TZ": global_settings.timezone,
+            "USER": f"{global_settings.puid}:{global_settings.pgid}"
+        }
+
+        # Scan blueprint schema for fields with use_global
+        for field_name, field_schema in blueprint.schema_json.items():
+            use_global = field_schema.get('use_global')
+            if not use_global:
+                continue
+
+            schema_path = field_schema.get('schema', '')
+            if not schema_path:
+                continue
+
+            # Parse schema path: "service.environment.PUID" or "service.user"
+            parts = schema_path.split('.')
+            if len(parts) < 2 or parts[0] != 'service':
+                continue
+
+            # Check if value exists in service_config
+            if len(parts) == 2:
+                # Service-level field like "service.user"
+                field_key = parts[1]
+                if field_key not in result:
+                    # Field missing, inject global value
+                    if use_global in global_mapping:
+                        result[field_key] = global_mapping[use_global]
+                        logger.debug(f"Injected global {use_global} into service.{field_key}")
+
+            elif len(parts) == 3 and parts[1] == 'environment':
+                # Environment variable like "service.environment.PUID"
+                env_key = parts[2]
+                if 'environment' not in result:
+                    result['environment'] = {}
+
+                if env_key not in result['environment']:
+                    # Environment var missing, inject global value
+                    if use_global in global_mapping:
+                        result['environment'][env_key] = global_mapping[use_global]
+                        logger.debug(f"Injected global {use_global} into service.environment.{env_key}")
+
+        return result
 
     def _apply_transforms(
         self,

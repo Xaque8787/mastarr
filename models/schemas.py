@@ -62,6 +62,7 @@ class FieldSchema(BaseModel):
     # Schema routing - dot notation: "service.image", "compose.networks", "metadata.admin_user"
     schema: Optional[str] = None
     compose_transform: Optional[str] = None  # Transform function name: "port_mapping", "volume_mapping"
+    use_global: Optional[str] = None  # Global setting to use if field is blank: "PUID", "PGID", "TZ", "USER"
 
 
 class BlueprintSchema(BaseModel):

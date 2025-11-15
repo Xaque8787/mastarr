@@ -190,3 +190,36 @@ def transform_port_to_long_form(port_definition: Union[Dict[str, Any], str, int]
         return port_definition
 
     return parse_short_form_port(port_definition)
+
+
+def transform_user_format(user_input: Union[str, int, Dict[str, int]]) -> str:
+    """
+    Transform user input into Docker user format (PUID:PGID).
+
+    Args:
+        user_input: Can be:
+            - String: "1000:1000" (already formatted)
+            - String: "1000" (just PUID, will duplicate)
+            - Int: 1000 (just PUID, will duplicate)
+            - Dict: {"puid": 1000, "pgid": 1000}
+
+    Returns:
+        Formatted user string: "1000:1000"
+
+    Examples:
+        "1000:1000" → "1000:1000"
+        "1000" → "1000:1000"
+        1000 → "1000:1000"
+        {"puid": 1000, "pgid": 1001} → "1000:1001"
+    """
+    if isinstance(user_input, dict):
+        puid = user_input.get("puid", user_input.get("PUID", 1000))
+        pgid = user_input.get("pgid", user_input.get("PGID", 1000))
+        return f"{puid}:{pgid}"
+
+    user_str = str(user_input)
+
+    if ":" in user_str:
+        return user_str
+
+    return f"{user_str}:{user_str}"
