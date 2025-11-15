@@ -153,8 +153,9 @@ class ComposeGenerator:
             if len(parts) == 2:
                 # Service-level field like "service.user"
                 field_key = parts[1]
-                if field_key not in result:
-                    # Field missing, inject global value
+                # Inject if field is missing OR if it's None
+                if field_key not in result or result[field_key] is None:
+                    # Field missing or None, inject global value
                     if use_global in global_mapping:
                         result[field_key] = global_mapping[use_global]
                         logger.debug(f"Injected global {use_global} into service.{field_key}")
@@ -165,8 +166,9 @@ class ComposeGenerator:
                 if 'environment' not in result:
                     result['environment'] = {}
 
-                if env_key not in result['environment']:
-                    # Environment var missing, inject global value
+                # Inject if env var is missing OR if it's None
+                if env_key not in result['environment'] or result['environment'][env_key] is None:
+                    # Environment var missing or None, inject global value
                     if use_global in global_mapping:
                         result['environment'][env_key] = global_mapping[use_global]
                         logger.debug(f"Injected global {use_global} into service.environment.{env_key}")

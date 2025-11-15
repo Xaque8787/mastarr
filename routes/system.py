@@ -49,9 +49,7 @@ async def get_settings(db: Session = Depends(get_db)):
 
 @router.put("/settings")
 async def update_settings(
-    puid: int = None,
-    pgid: int = None,
-    timezone: str = None,
+    settings_update: Dict[str, Any],
     db: Session = Depends(get_db)
 ):
     """Update global settings"""
@@ -60,17 +58,18 @@ async def update_settings(
         settings = GlobalSettings()
         db.add(settings)
 
-    if puid is not None:
-        settings.puid = puid
-    if pgid is not None:
-        settings.pgid = pgid
-    if timezone is not None:
-        settings.timezone = timezone
+    # Update fields if provided
+    if 'puid' in settings_update and settings_update['puid'] is not None:
+        settings.puid = settings_update['puid']
+    if 'pgid' in settings_update and settings_update['pgid'] is not None:
+        settings.pgid = settings_update['pgid']
+    if 'timezone' in settings_update and settings_update['timezone'] is not None:
+        settings.timezone = settings_update['timezone']
 
     db.commit()
     db.refresh(settings)
 
-    logger.info("Global settings updated")
+    logger.info(f"Global settings updated: PUID={settings.puid}, PGID={settings.pgid}, TZ={settings.timezone}")
     return settings
 
 
@@ -102,12 +101,14 @@ async def get_affected_apps(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
             if len(parts) == 2 and parts[0] == "service":
                 field_key = parts[1]
-                if field_key not in service_data:
+                # Check if field is missing OR is None
+                if field_key not in service_data or service_data[field_key] is None:
                     uses_globals.append(use_global)
 
             elif len(parts) == 3 and parts[0] == "service" and parts[1] == "environment":
                 env_key = parts[2]
-                if env_key not in env:
+                # Check if env var is missing OR is None
+                if env_key not in env or env[env_key] is None:
                     uses_globals.append(use_global)
 
         if uses_globals:
