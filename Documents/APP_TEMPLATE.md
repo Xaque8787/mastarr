@@ -714,12 +714,76 @@ These come from the `GlobalSettings` database table:
 
 - `${GLOBAL.PUID}` - User ID for file permissions (default: 1000)
 - `${GLOBAL.PGID}` - Group ID for file permissions (default: 1000)
+- `${GLOBAL.USER}` - Docker user for container process (default: computed as PUID:PGID if not set)
 - `${GLOBAL.TIMEZONE}` - System timezone (default: America/New_York)
 - `${GLOBAL.NETWORK_NAME}` - Docker network name (default: mastarr_net)
 - `${GLOBAL.NETWORK_SUBNET}` - Network subnet (default: 10.21.12.0/24)
 - `${GLOBAL.NETWORK_GATEWAY}` - Network gateway (default: 10.21.12.1)
 - `${GLOBAL.STACKS_PATH}` - Base path for app stacks
 - `${GLOBAL.DATA_PATH}` - Base path for app data
+
+#### Understanding PUID/PGID vs USER
+
+**PUID and PGID:**
+- Used as environment variables for file ownership/permissions
+- Many containers use these environment variables internally to set file ownership
+- Example: Files created by the app will be owned by PUID:PGID
+
+**USER:**
+- Used as the service-level `user:` field in docker-compose.yml
+- Determines which user the container process runs as
+- Can be different from PUID:PGID to separate process user from file ownership
+- Supports formats: `"1000:1000"`, `"root"`, `"username:groupname"`
+
+**When USER is blank:**
+- Automatically computed as `PUID:PGID` (e.g., `"1001:1002"`)
+- Provides backward compatibility
+
+**When USER is set:**
+- Uses the explicit value (e.g., `"root"`, `"1500:1500"`)
+- PUID/PGID still available as environment variables
+- Allows running container as root while files are owned by PUID:PGID
+
+**Example Scenarios:**
+
+*Scenario 1: Standard Setup (USER blank)*
+```
+PUID: 1001
+PGID: 1002
+USER: (blank)
+
+Result in compose.yaml:
+  environment:
+    - PUID=1001
+    - PGID=1002
+  user: "1001:1002"  # Auto-computed
+```
+
+*Scenario 2: Root Container, Non-Root Files*
+```
+PUID: 1001
+PGID: 1002
+USER: root
+
+Result in compose.yaml:
+  environment:
+    - PUID=1001       # For file ownership
+    - PGID=1002       # For file ownership
+  user: "root"        # Container runs as root
+```
+
+*Scenario 3: Custom User*
+```
+PUID: 1001
+PGID: 1002
+USER: 1500:1500
+
+Result in compose.yaml:
+  environment:
+    - PUID=1001
+    - PGID=1002
+  user: "1500:1500"   # Process runs as 1500:1500
+```
 
 ### Usage Examples
 
@@ -1279,6 +1343,19 @@ async def run(context: HookContext):
       "visible": true,
       "advanced": true,
       "schema": "service.environment.TZ"
+    },
+    "user": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Docker User",
+      "default": "${GLOBAL.USER}",
+      "description": "User to run container as (e.g., '1000:1000', 'root'). Leave blank to use PUID:PGID",
+      "placeholder": "Leave blank for auto (PUID:PGID)",
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "schema": "service.user",
+      "use_global": "USER"
     },
     "custom_environment": {
       "type": "array",

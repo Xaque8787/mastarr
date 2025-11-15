@@ -62,6 +62,9 @@ class TemplateExpander:
             text = text.replace('${GLOBAL.PUID}', str(self.global_settings.puid))
         if '${GLOBAL.PGID}' in text:
             text = text.replace('${GLOBAL.PGID}', str(self.global_settings.pgid))
+        if '${GLOBAL.USER}' in text:
+            user_value = self.global_settings.user if self.global_settings.user else f"{self.global_settings.puid}:{self.global_settings.pgid}"
+            text = text.replace('${GLOBAL.USER}', user_value)
         if '${GLOBAL.TIMEZONE}' in text:
             text = text.replace('${GLOBAL.TIMEZONE}', self.global_settings.timezone)
         if '${GLOBAL.NETWORK_NAME}' in text:

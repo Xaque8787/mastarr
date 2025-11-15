@@ -215,6 +215,19 @@
       "advanced": false,
       "schema": "service.environment.TZ"
     },
+    "user": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Docker User",
+      "default": "${GLOBAL.USER}",
+      "description": "User to run container as (e.g., '1000:1000', 'root'). Leave blank to use PUID:PGID",
+      "placeholder": "Leave blank for auto (PUID:PGID)",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.user",
+      "use_global": "USER"
+    },
     "service_network": {
       "type": "object",
       "label": "Network Configuration",
