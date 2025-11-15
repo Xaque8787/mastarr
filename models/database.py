@@ -100,6 +100,9 @@ class GlobalSettings(Base):
     puid = Column(Integer, default=1000)
     pgid = Column(Integer, default=1000)
 
+    # Docker user field (independent from PUID:PGID)
+    user = Column(String, default=None, nullable=True)
+
     # Timezone
     timezone = Column(String, default="UTC")
 

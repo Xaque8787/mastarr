@@ -768,12 +768,27 @@
                         <small style="color: #94a3b8; display: block; margin-top: 4px;">Container timezone (e.g., America/New_York)</small>
                     </div>
 
-                    <div class="form-group" style="background: #1e293b; padding: 12px; border-radius: 8px; border: 1px solid #334155;">
-                        <label style="margin-bottom: 4px;">Docker User (Computed)</label>
-                        <div style="padding: 8px; background: #0f172a; border-radius: 4px; font-family: monospace; color: #94a3b8;">
-                            <span x-text="settingsData.puid || '1000'"></span>:<span x-text="settingsData.pgid || '1000'"></span>
+                    <div class="form-group">
+                        <label for="user">Docker User</label>
+                        <input
+                            type="text"
+                            id="user"
+                            x-model="settingsData.user"
+                            :placeholder="(settingsData.puid || '1000') + ':' + (settingsData.pgid || '1000') + ' (default fallback)'"
+                        >
+                        <small style="color: #94a3b8; display: block; margin-top: 4px;">
+                            Optional: Override the user field for Docker containers. Leave blank to auto-compute as PUID:PGID
+                        </small>
+                        <div x-show="settingsData.user" style="margin-top: 8px; padding: 8px; background: #1e293b; border-radius: 4px; border: 1px solid #334155;">
+                            <small style="color: #94a3b8;">
+                                ℹ️ Using explicit value: <span style="font-family: monospace; color: #3b82f6;" x-text="settingsData.user"></span>
+                            </small>
                         </div>
-                        <small style="color: #94a3b8; display: block; margin-top: 4px;">This is the value used for service-level "user" field in compose files</small>
+                        <div x-show="!settingsData.user" style="margin-top: 8px; padding: 8px; background: #1e293b; border-radius: 4px; border: 1px solid #334155;">
+                            <small style="color: #94a3b8;">
+                                ℹ️ Will use computed value: <span style="font-family: monospace; color: #3b82f6;"><span x-text="settingsData.puid || '1000'"></span>:<span x-text="settingsData.pgid || '1000'"></span></span>
+                            </small>
+                        </div>
                     </div>
 
                     <div x-show="affectedApps.length > 0" style="margin: 20px 0; padding: 16px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;">

@@ -127,11 +127,14 @@ class ComposeGenerator:
         result = service_config.copy()
 
         # Build mapping of global keys to values
+        # USER: Use explicit user field if set, otherwise fallback to PUID:PGID
+        user_value = global_settings.user if global_settings.user else f"{global_settings.puid}:{global_settings.pgid}"
+
         global_mapping = {
             "PUID": global_settings.puid,
             "PGID": global_settings.pgid,
             "TZ": global_settings.timezone,
-            "USER": f"{global_settings.puid}:{global_settings.pgid}"
+            "USER": user_value
         }
 
         # Scan blueprint schema for fields with use_global

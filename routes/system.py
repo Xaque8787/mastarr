@@ -63,13 +63,16 @@ async def update_settings(
         settings.puid = settings_update['puid']
     if 'pgid' in settings_update and settings_update['pgid'] is not None:
         settings.pgid = settings_update['pgid']
+    if 'user' in settings_update:
+        # Allow setting user to None (to clear it)
+        settings.user = settings_update['user'] if settings_update['user'] else None
     if 'timezone' in settings_update and settings_update['timezone'] is not None:
         settings.timezone = settings_update['timezone']
 
     db.commit()
     db.refresh(settings)
 
-    logger.info(f"Global settings updated: PUID={settings.puid}, PGID={settings.pgid}, TZ={settings.timezone}")
+    logger.info(f"Global settings updated: PUID={settings.puid}, PGID={settings.pgid}, USER={settings.user}, TZ={settings.timezone}")
     return settings
 
 
