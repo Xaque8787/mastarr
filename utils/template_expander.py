@@ -62,6 +62,8 @@ class TemplateExpander:
             text = text.replace('${GLOBAL.PUID}', str(self.global_settings.puid))
         if '${GLOBAL.PGID}' in text:
             text = text.replace('${GLOBAL.PGID}', str(self.global_settings.pgid))
+        if '${GLOBAL.UMASK}' in text:
+            text = text.replace('${GLOBAL.UMASK}', str(self.global_settings.umask))
         if '${GLOBAL.USER}' in text:
             user_value = self.global_settings.user if self.global_settings.user else f"{self.global_settings.puid}:{self.global_settings.pgid}"
             text = text.replace('${GLOBAL.USER}', user_value)

@@ -204,6 +204,18 @@
       "advanced": false,
       "schema": "service.environment.PGID"
     },
+    "umask_env": {
+      "type": "integer",
+      "ui_component": "number",
+      "label": "UMASK",
+      "default": "${GLOBAL.UMASK}",
+      "description": "File creation mask (e.g., 22 for 0022, 2 for 0002)",
+      "placeholder": "22",
+      "required": false,
+      "visible": true,
+      "advanced": false,
+      "schema": "service.environment.UMASK"
+    },
     "tz_env": {
       "type": "string",
       "ui_component": "text",

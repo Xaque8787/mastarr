@@ -135,6 +135,7 @@ class GlobalSettingsResponse(BaseModel):
     """Global settings response"""
     puid: int
     pgid: int
+    umask: int
     user: Optional[str] = None
     timezone: str
     network_name: str

@@ -99,6 +99,7 @@ class GlobalSettings(Base):
     # Docker user/group IDs
     puid = Column(Integer, default=1000)
     pgid = Column(Integer, default=1000)
+    umask = Column(Integer, default=22)
 
     # Docker user field (independent from PUID:PGID)
     user = Column(String, default=None, nullable=True)
