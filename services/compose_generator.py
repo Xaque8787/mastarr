@@ -133,6 +133,7 @@ class ComposeGenerator:
         global_mapping = {
             "PUID": global_settings.puid,
             "PGID": global_settings.pgid,
+            "UMASK": global_settings.umask,
             "TZ": global_settings.timezone,
             "USER": user_value
         }
