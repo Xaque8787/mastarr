@@ -2,12 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List
 
-from models.database import get_db
+from models.database import get_session
 from services.preset_service import PresetService
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["presets"])
+
+
+def get_db():
+    """Dependency for database session"""
+    db = get_session()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @router.get("/presets")
