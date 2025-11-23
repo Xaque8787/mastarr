@@ -1,0 +1,9 @@
+{
+  "id": "download_stack",
+  "name": "Download Manager Stack",
+  "description": "Prowlarr for indexer management - perfect starting point for download automation",
+  "icon": "download",
+  "apps": [
+    "prowlarr"
+  ]
+}

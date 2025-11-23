@@ -489,9 +489,14 @@
         <div class="info-box">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h3>System Information</h3>
-                <button class="btn btn-secondary" @click="openSettingsModal()" style="padding: 8px 16px;">
-                    ⚙️ Settings
-                </button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-secondary" @click="openPresetsModal()" style="padding: 8px 16px;">
+                        📦 Presets
+                    </button>
+                    <button class="btn btn-secondary" @click="openSettingsModal()" style="padding: 8px 16px;">
+                        ⚙️ Settings
+                    </button>
+                </div>
             </div>
             <div x-show="systemInfo" style="margin-top: 12px;">
                 <p><strong>Docker Version:</strong> <span x-text="systemInfo?.docker_version"></span></p>
@@ -835,6 +840,152 @@
             </div>
         </div>
 
+        <!-- Presets Modal -->
+        <div x-show="showPresetsModal" class="modal" @click.self="closePresetsModal()" x-cloak>
+            <div class="modal-content" style="max-width: 700px;">
+                <div class="modal-header">
+                    <h2>App Presets</h2>
+                    <button class="close-btn" @click="closePresetsModal()">&times;</button>
+                </div>
+
+                <div x-show="presetError" class="error-message" x-text="presetError"></div>
+                <div x-show="presetSuccess" class="success-message" style="white-space: pre-line;" x-text="presetSuccess"></div>
+
+                <!-- Preset Selection View -->
+                <div x-show="!selectedPreset && !showPresetInputForm">
+                    <p style="color: #94a3b8; margin-bottom: 20px;">
+                        Select a preset to quickly configure multiple apps at once. Only required fields without defaults will need your input.
+                    </p>
+
+                    <div class="grid" style="grid-template-columns: 1fr; gap: 16px;">
+                        <template x-for="preset in presets" :key="preset.id">
+                            <div class="card" style="cursor: pointer; padding: 20px;" @click="selectPreset(preset)">
+                                <h3 style="margin-bottom: 8px; font-size: 1.2rem;" x-text="preset.name"></h3>
+                                <p style="margin-bottom: 12px; font-size: 0.95rem;" x-text="preset.description"></p>
+                                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                                    <template x-for="app in preset.apps" :key="app">
+                                        <span style="background: #334155; padding: 4px 10px; border-radius: 8px; font-size: 0.85rem;" x-text="app"></span>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="presets.length === 0 && !presetError" style="text-align: center; padding: 40px; color: #64748b;">
+                        <p>No presets available</p>
+                    </div>
+                </div>
+
+                <!-- Preset Details View -->
+                <div x-show="selectedPreset && !showPresetInputForm">
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 8px; color: #3b82f6;" x-text="selectedPreset?.name"></h3>
+                        <p style="color: #94a3b8; margin-bottom: 12px;" x-text="selectedPreset?.description"></p>
+                        <p style="color: #e2e8f0; font-weight: 500; margin-bottom: 8px;">Apps in this preset:</p>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+                            <template x-for="app in selectedPreset?.apps" :key="app">
+                                <span style="background: #334155; padding: 6px 12px; border-radius: 8px; font-size: 0.9rem;" x-text="app"></span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="presetAnalysis">
+                        <div x-show="presetAnalysis?.missing_blueprints?.length > 0" style="background: #7c2d12; border: 1px solid #dc2626; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                            <p style="font-weight: 500; margin-bottom: 8px;">⚠️ Missing Blueprints:</p>
+                            <ul style="margin-left: 20px; color: #fca5a5;">
+                                <template x-for="app in presetAnalysis.missing_blueprints" :key="app">
+                                    <li x-text="app"></li>
+                                </template>
+                            </ul>
+                        </div>
+
+                        <div x-show="presetAnalysis?.already_exists?.length > 0" style="background: #422006; border: 1px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                            <p style="font-weight: 500; margin-bottom: 8px;">ℹ️ Already Installed or Pending:</p>
+                            <ul style="margin-left: 20px; color: #fbbf24;">
+                                <template x-for="app in presetAnalysis.already_exists" :key="app">
+                                    <li x-text="app"></li>
+                                </template>
+                            </ul>
+                        </div>
+
+                        <div x-show="presetAnalysis?.available_apps?.length > 0" style="background: #064e3b; border: 1px solid #10b981; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                            <p style="font-weight: 500; margin-bottom: 8px;">✓ Will Add to Pending:</p>
+                            <ul style="margin-left: 20px; color: #6ee7b7;">
+                                <template x-for="app in presetAnalysis.available_apps" :key="app">
+                                    <li x-text="app"></li>
+                                </template>
+                            </ul>
+                        </div>
+
+                        <div x-show="Object.keys(presetAnalysis?.required_inputs || {}).length > 0" style="background: #1e293b; border: 1px solid #3b82f6; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                            <p style="font-weight: 500; margin-bottom: 8px;">📝 Required Inputs:</p>
+                            <p style="color: #94a3b8; font-size: 0.9rem;">Some apps require additional information (fields without defaults).</p>
+                        </div>
+
+                        <div x-show="Object.keys(presetAnalysis?.required_inputs || {}).length === 0 && presetAnalysis?.available_apps?.length > 0" style="background: #1e293b; border: 1px solid #3b82f6; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                            <p style="color: #94a3b8; font-size: 0.9rem;">✨ All apps use default values. Click Apply to add them to pending!</p>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-top: 20px;">
+                        <button class="btn btn-secondary" @click="selectedPreset = null; presetAnalysis = null;" style="flex: 1;">
+                            Back
+                        </button>
+                        <button
+                            class="btn"
+                            @click="applyPresetAction()"
+                            :disabled="!presetAnalysis || presetAnalysis.available_apps?.length === 0"
+                            style="flex: 1;"
+                        >
+                            Apply Preset
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Required Inputs Form -->
+                <div x-show="showPresetInputForm">
+                    <div style="background: #0f172a; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                        <h3 style="margin-bottom: 8px; color: #3b82f6;">Required Information</h3>
+                        <p style="color: #94a3b8; font-size: 0.9rem;">
+                            Please provide values for required fields that don't have defaults. Other fields will use their default values.
+                        </p>
+                    </div>
+
+                    <form @submit.prevent="finalizePreset()">
+                        <template x-for="(fields, appName) in presetAnalysis?.required_inputs" :key="appName">
+                            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                <h4 style="color: #f1f5f9; margin-bottom: 12px; font-size: 1.1rem;" x-text="appName"></h4>
+
+                                <template x-for="field in fields" :key="field.field">
+                                    <div class="form-group" style="margin-bottom: 12px;">
+                                        <label :for="appName + '_' + field.field" x-text="field.label"></label>
+                                        <input
+                                            :type="field.ui_component === 'password' ? 'password' : 'text'"
+                                            :id="appName + '_' + field.field"
+                                            :placeholder="field.placeholder || ''"
+                                            x-model="presetInputs[appName][field.field]"
+                                            required
+                                        >
+                                        <small x-show="field.description" style="color: #94a3b8; display: block; margin-top: 4px;" x-text="field.description"></small>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <div style="display: flex; gap: 12px; margin-top: 20px;">
+                            <button type="button" class="btn btn-secondary" @click="cancelPresetInputForm()" style="flex: 1;">
+                                Cancel
+                            </button>
+                            <button type="submit" class="btn" :disabled="applyingPreset" style="flex: 1;">
+                                <span x-show="!applyingPreset">Finalize Preset</span>
+                                <span x-show="applyingPreset">Applying...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <section style="margin-top: 60px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2 style="font-size: 1.8rem; margin: 0;">Configured & Installed Apps</h2>
@@ -946,6 +1097,15 @@
                 applyingSettings: false,
                 regeneratingApps: false,
                 settingsApplied: false,
+                showPresetsModal: false,
+                presets: [],
+                selectedPreset: null,
+                presetAnalysis: null,
+                presetInputs: {},
+                showPresetInputForm: false,
+                applyingPreset: false,
+                presetError: null,
+                presetSuccess: null,
 
                 async init() {
                     await this.loadSystemInfo();
@@ -1388,6 +1548,132 @@
                         this.settingsError = `Failed to restart apps: ${error.message}`;
                     } finally {
                         this.regeneratingApps = false;
+                    }
+                },
+
+                async openPresetsModal() {
+                    this.showPresetsModal = true;
+                    this.selectedPreset = null;
+                    this.presetAnalysis = null;
+                    this.presetInputs = {};
+                    this.showPresetInputForm = false;
+                    this.presetError = null;
+                    this.presetSuccess = null;
+                    await this.loadPresets();
+                },
+
+                closePresetsModal() {
+                    this.showPresetsModal = false;
+                    this.selectedPreset = null;
+                    this.presetAnalysis = null;
+                    this.presetInputs = {};
+                    this.showPresetInputForm = false;
+                    this.presetError = null;
+                    this.presetSuccess = null;
+                },
+
+                async loadPresets() {
+                    try {
+                        const response = await fetch('/api/presets');
+                        const data = await response.json();
+                        this.presets = data.presets || [];
+                    } catch (error) {
+                        console.error('Failed to load presets:', error);
+                        this.presetError = 'Failed to load presets';
+                    }
+                },
+
+                async selectPreset(preset) {
+                    this.selectedPreset = preset;
+                    this.presetError = null;
+                    this.presetSuccess = null;
+
+                    try {
+                        const response = await fetch(`/api/presets/${preset.id}/required-inputs`);
+                        if (!response.ok) {
+                            throw new Error('Failed to analyze preset');
+                        }
+
+                        this.presetAnalysis = await response.json();
+                    } catch (error) {
+                        console.error('Failed to analyze preset:', error);
+                        this.presetError = 'Failed to analyze preset';
+                    }
+                },
+
+                async applyPresetAction() {
+                    if (!this.selectedPreset || !this.presetAnalysis) {
+                        return;
+                    }
+
+                    const hasRequiredInputs = Object.keys(this.presetAnalysis.required_inputs || {}).length > 0;
+
+                    if (hasRequiredInputs) {
+                        this.presetInputs = {};
+                        Object.keys(this.presetAnalysis.required_inputs).forEach(appName => {
+                            this.presetInputs[appName] = {};
+                            this.presetAnalysis.required_inputs[appName].forEach(field => {
+                                this.presetInputs[appName][field.field] = '';
+                            });
+                        });
+                        this.showPresetInputForm = true;
+                    } else {
+                        await this.finalizePreset();
+                    }
+                },
+
+                cancelPresetInputForm() {
+                    this.showPresetInputForm = false;
+                    this.presetInputs = {};
+                },
+
+                async finalizePreset() {
+                    this.applyingPreset = true;
+                    this.presetError = null;
+                    this.presetSuccess = null;
+
+                    try {
+                        const response = await fetch(`/api/presets/${this.selectedPreset.id}/apply`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                inputs: this.presetInputs
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.detail || 'Failed to apply preset');
+                        }
+
+                        const result = await response.json();
+
+                        await this.loadApps();
+
+                        let message = result.message;
+                        if (result.skipped && result.skipped.length > 0) {
+                            message += `\n\nSkipped apps: ${result.skipped.join(', ')}`;
+                            if (result.errors) {
+                                message += '\n\nErrors:';
+                                Object.keys(result.errors).forEach(appName => {
+                                    message += `\n- ${appName}: ${result.errors[appName]}`;
+                                });
+                            }
+                        }
+
+                        this.presetSuccess = message;
+
+                        setTimeout(() => {
+                            this.closePresetsModal();
+                        }, 3000);
+
+                    } catch (error) {
+                        console.error('Failed to apply preset:', error);
+                        this.presetError = `Failed to apply preset: ${error.message}`;
+                    } finally {
+                        this.applyingPreset = false;
                     }
                 }
             };

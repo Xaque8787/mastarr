@@ -1,0 +1,11 @@
+{
+  "id": "arr_suite",
+  "name": "*arr Suite",
+  "description": "Complete automation suite with Prowlarr, Sonarr, and Radarr for TV and movie management",
+  "icon": "layers",
+  "apps": [
+    "prowlarr",
+    "sonarr",
+    "radarr"
+  ]
+}

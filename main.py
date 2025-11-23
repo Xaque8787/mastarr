@@ -10,7 +10,7 @@ from models.database import init_db
 from services.system_hooks import SystemHooks, get_hooks, initialize_system_hooks, mark_hook_executed
 from utils.logger import setup_logging
 from utils.first_run import FirstRunInitializer
-from routes import apps_router, blueprints_router, system_router
+from routes import apps_router, blueprints_router, system_router, presets_router
 
 logger = setup_logging(os.getenv("LOG_LEVEL", "INFO"))
 
@@ -76,6 +76,7 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(apps_router)
 app.include_router(blueprints_router)
 app.include_router(system_router)
+app.include_router(presets_router)
 
 
 @app.get("/", response_class=HTMLResponse)

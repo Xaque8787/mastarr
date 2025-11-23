@@ -1,0 +1,12 @@
+{
+  "id": "media_stack",
+  "name": "Complete Media Stack",
+  "description": "Full *arr suite with Jellyfin for comprehensive media management and streaming",
+  "icon": "film",
+  "apps": [
+    "jellyfin",
+    "prowlarr",
+    "sonarr",
+    "radarr"
+  ]
+}
