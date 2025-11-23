@@ -196,7 +196,7 @@ class PresetService:
                     name=app_name,
                     db_name=app_name,
                     blueprint_name=app_name,
-                    status="pending",
+                    status="configured",
                     raw_inputs=inputs
                 )
 

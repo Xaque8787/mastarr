@@ -1032,11 +1032,16 @@
                         </p>
 
                         <div class="app-actions">
-                            <!-- Configured state: Show Install button -->
+                            <!-- Configured state: Show Edit and Install buttons -->
                             <template x-if="app.status === 'configured'">
-                                <button class="btn btn-success btn-small" @click="installSingleApp(app.id)">
-                                    Install
-                                </button>
+                                <div style="display: flex; gap: 8px; width: 100%;">
+                                    <button class="btn btn-secondary btn-small" @click="editApp(app)">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-success btn-small" @click="installSingleApp(app.id)">
+                                        Install
+                                    </button>
+                                </div>
                             </template>
 
                             <!-- Running state: Show Update/Stop buttons -->
