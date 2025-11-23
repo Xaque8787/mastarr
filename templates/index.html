@@ -643,6 +643,34 @@
                                     <label x-text="field.label"></label>
                                     <p class="field-description" x-show="field.description" x-text="field.description"></p>
 
+                                    <!-- Global Suggestions Quick-Add -->
+                                    <template x-if="field.global_suggestions && field.global_suggestions.length > 0">
+                                        <div style="margin-bottom: 12px;">
+                                            <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;">Quick Add:</div>
+                                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                                <template x-for="globalVar in field.global_suggestions" :key="globalVar">
+                                                    <button
+                                                        type="button"
+                                                        class="btn-add"
+                                                        style="padding: 6px 12px; font-size: 0.85rem;"
+                                                        @click="addGlobalVariable(fieldName, globalVar)"
+                                                        :disabled="formData[fieldName].some(item => item.key === globalVar)"
+                                                    >
+                                                        + <span x-text="globalVar"></span>
+                                                    </button>
+                                                </template>
+                                                <button
+                                                    type="button"
+                                                    class="btn-add"
+                                                    style="padding: 6px 12px; font-size: 0.85rem;"
+                                                    @click="addArrayItem(fieldName, {key: '', value: ''})"
+                                                >
+                                                    + Custom
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </template>
+
                                     <template x-for="(item, index) in formData[fieldName]" :key="index">
                                         <div class="array-item">
                                             <div class="array-item-field">
@@ -657,9 +685,12 @@
                                         </div>
                                     </template>
 
-                                    <button type="button" class="btn-add" @click="addArrayItem(fieldName, {key: '', value: ''})">
-                                        + Add <span x-text="field.label.replace(/s$/, '')"></span>
-                                    </button>
+                                    <!-- Traditional Add Button (only show if no global_suggestions) -->
+                                    <template x-if="!field.global_suggestions || field.global_suggestions.length === 0">
+                                        <button type="button" class="btn-add" @click="addArrayItem(fieldName, {key: '', value: ''})">
+                                            + Add <span x-text="field.label.replace(/s$/, '')"></span>
+                                        </button>
+                                    </template>
                                 </div>
                             </template>
 
@@ -1111,12 +1142,23 @@
                 applyingPreset: false,
                 presetError: null,
                 presetSuccess: null,
+                globalSettings: null,
 
                 async init() {
                     await this.loadSystemInfo();
+                    await this.loadGlobalSettings();
                     await this.loadBlueprints();
                     await this.loadApps();
                     this.loading = false;
+                },
+
+                async loadGlobalSettings() {
+                    try {
+                        const response = await fetch('/api/system/settings');
+                        this.globalSettings = await response.json();
+                    } catch (error) {
+                        console.error('Failed to load global settings:', error);
+                    }
                 },
 
                 async loadSystemInfo() {
@@ -1426,6 +1468,34 @@
                         this.formData[fieldName] = [];
                     }
                     this.formData[fieldName].push(item);
+                },
+
+                async addGlobalVariable(fieldName, varName) {
+                    if (!this.formData[fieldName]) {
+                        this.formData[fieldName] = [];
+                    }
+
+                    // Check if already added
+                    if (this.formData[fieldName].some(item => item.key === varName)) {
+                        return;
+                    }
+
+                    // Get value from global settings
+                    let value = '';
+                    if (this.globalSettings) {
+                        const mapping = {
+                            'PUID': this.globalSettings.puid,
+                            'PGID': this.globalSettings.pgid,
+                            'TZ': this.globalSettings.timezone,
+                            'UMASK': this.globalSettings.umask
+                        };
+                        value = mapping[varName] || '';
+                    }
+
+                    this.formData[fieldName].push({
+                        key: varName,
+                        value: value !== null ? String(value) : ''
+                    });
                 },
 
                 removeArrayItem(fieldName, index) {

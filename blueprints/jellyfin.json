@@ -259,13 +259,14 @@
     "custom_environment": {
       "type": "array",
       "ui_component": "key_value_pairs",
-      "label": "Custom Environment Variables",
-      "description": "Add custom environment variables",
+      "label": "Environment Variables",
+      "description": "Add environment variables (quick-add common globals or custom values)",
       "default": [],
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.environment.*"
+      "schema": "service.environment.*",
+      "global_suggestions": ["PUID", "PGID", "TZ", "UMASK"]
     },
     "custom_volumes": {
       "type": "array",
