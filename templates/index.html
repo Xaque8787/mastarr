@@ -648,6 +648,14 @@
                                         <div style="margin-bottom: 12px;">
                                             <div style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;">Quick Add:</div>
                                             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                                <button
+                                                    type="button"
+                                                    class="btn-add"
+                                                    style="padding: 6px 12px; font-size: 0.85rem;"
+                                                    @click="addArrayItem(fieldName, {key: '', value: ''})"
+                                                >
+                                                    + Custom
+                                                </button>
                                                 <template x-for="globalVar in field.global_suggestions" :key="globalVar">
                                                     <button
                                                         type="button"
@@ -659,14 +667,6 @@
                                                         + <span x-text="globalVar"></span>
                                                     </button>
                                                 </template>
-                                                <button
-                                                    type="button"
-                                                    class="btn-add"
-                                                    style="padding: 6px 12px; font-size: 0.85rem;"
-                                                    @click="addArrayItem(fieldName, {key: '', value: ''})"
-                                                >
-                                                    + Custom
-                                                </button>
                                             </div>
                                         </div>
                                     </template>
