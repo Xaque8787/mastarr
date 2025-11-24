@@ -1,4 +1,3 @@
-import yaml
 import docker
 import subprocess
 import os
@@ -166,23 +165,7 @@ class AppInstaller:
             env_path = stack_path / ".env"
 
             generator.write_env_file(app.db_name, app.raw_inputs, blueprint, str(env_path))
-
-            compose_dict = compose_obj.model_dump(exclude_none=True)
-
-            # Remove empty strings, empty dicts, and empty lists
-            compose_dict = self._clean_empty_values(compose_dict)
-
-            if 'services' in compose_dict:
-                for service_name, service_config in compose_dict['services'].items():
-                    if 'environment' in service_config and isinstance(service_config['environment'], dict):
-                        service_config['environment'] = [
-                            f"{k}={v}" for k, v in service_config['environment'].items()
-                        ]
-
-            with open(compose_path, 'w') as f:
-                yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
-
-            logger.info(f"✓ Wrote compose file to {compose_path}")
+            generator.write_compose_file(compose_obj, str(compose_path))
 
             generator.close()
 
@@ -300,59 +283,6 @@ class AppInstaller:
         """Fetch blueprints from database"""
         blueprints = self.db.query(Blueprint).filter(Blueprint.name.in_(names)).all()
         return {bp.name: bp for bp in blueprints}
-
-    def _clean_empty_values(self, data, parent_key=None):
-        """
-        Recursively remove empty strings, empty dicts, and empty lists from data.
-        Keeps False and 0 as they are valid values.
-
-        Special case: Preserves empty dicts in 'networks' sections because
-        an empty dict like `test_network: {}` is valid in Docker Compose
-        (means attach to network with default settings).
-
-        Args:
-            data: Dictionary, list, or other value to clean
-            parent_key: Parent key name for context-aware cleaning
-
-        Returns:
-            Cleaned data structure
-        """
-        if isinstance(data, dict):
-            cleaned = {}
-            for key, value in data.items():
-                # Special case: Preserve empty dicts in networks sections
-                # e.g., networks: {test_network: {}} is valid and means "attach with defaults"
-                if key == 'networks' and isinstance(value, dict):
-                    # Keep networks dict and preserve empty network configs
-                    networks_cleaned = {}
-                    for net_name, net_config in value.items():
-                        # Clean the network config but keep it even if empty
-                        if isinstance(net_config, dict):
-                            net_config_cleaned = self._clean_empty_values(net_config, parent_key='network_config')
-                            # Keep the network entry even if config is empty dict
-                            networks_cleaned[net_name] = net_config_cleaned if net_config_cleaned else {}
-                        else:
-                            networks_cleaned[net_name] = net_config
-                    cleaned[key] = networks_cleaned
-                    continue
-
-                # Recursively clean nested structures
-                cleaned_value = self._clean_empty_values(value, parent_key=key)
-
-                # Skip empty strings, empty dicts, empty lists
-                # But keep False and 0 as they are valid values
-                if cleaned_value == '' or \
-                   (isinstance(cleaned_value, dict) and len(cleaned_value) == 0) or \
-                   (isinstance(cleaned_value, list) and len(cleaned_value) == 0):
-                    continue
-
-                cleaned[key] = cleaned_value
-            return cleaned
-        elif isinstance(data, list):
-            # Clean each item in the list
-            return [self._clean_empty_values(item, parent_key=parent_key) for item in data if item not in ('', None)]
-        else:
-            return data
 
     def close(self):
         """Close database session"""
