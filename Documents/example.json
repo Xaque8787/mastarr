@@ -274,6 +274,41 @@
       "advanced": false,
       "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
     },
+    "custom_network": {
+      "type": "object",
+      "label": "Custom Network",
+      "description": "Additional network for this container",
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "fields": {
+        "network_name": {
+          "type": "string",
+          "label": "Network Name",
+          "default": "test_network",
+          "placeholder": "custom_network_name"
+        },
+        "ipv4_address": {
+          "type": "string",
+          "label": "Static IP Address",
+          "default": "",
+          "placeholder": "Leave blank for DHCP"
+        }
+      },
+      "schema": "service.networks",
+      "compose_transform": "network_config"
+    },
+    "compose_network_test": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Test Network Definition (internal)",
+      "default": "{\"external\": false}",
+      "description": "Defines test_network at compose level. Set external:true for existing networks, false to create new.",
+      "required": false,
+      "visible": false,
+      "advanced": false,
+      "schema": "compose.networks.test_network"
+    },
     "custom_environment": {
       "type": "array",
       "ui_component": "key_value_pairs",

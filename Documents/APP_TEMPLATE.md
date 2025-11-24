@@ -423,6 +423,131 @@ The `ui_component` property determines how the field is rendered in the UI.
 
 ---
 
+## Creating Custom Networks
+
+Applications can attach to custom Docker networks in addition to or instead of the default `mastarr_net` network. This is useful for network isolation, multi-network setups, or connecting to external networks.
+
+### Basic Custom Network Setup
+
+To add a custom network to your application, you need two fields:
+
+1. **Service Network Configuration** - Attaches the container to the network
+2. **Compose Network Definition** - Defines the network at the compose level
+
+### Example: Adding a Test Network
+
+```json
+{
+  "schema": {
+    "service_network": {
+      "type": "object",
+      "label": "Primary Network",
+      "description": "Main network configuration",
+      "fields": {
+        "network_name": {
+          "type": "string",
+          "label": "Network Name",
+          "default": "${GLOBAL.NETWORK_NAME}"
+        },
+        "ipv4_address": {
+          "type": "string",
+          "label": "Static IP",
+          "default": "10.21.12.3"
+        }
+      },
+      "schema": "service.networks",
+      "compose_transform": "network_config"
+    },
+    "custom_network": {
+      "type": "object",
+      "label": "Custom Network",
+      "description": "Additional network for this container",
+      "advanced": true,
+      "fields": {
+        "network_name": {
+          "type": "string",
+          "label": "Network Name",
+          "default": "test_network"
+        },
+        "ipv4_address": {
+          "type": "string",
+          "label": "Static IP",
+          "default": "",
+          "placeholder": "Leave blank for DHCP"
+        }
+      },
+      "schema": "service.networks",
+      "compose_transform": "network_config"
+    },
+    "compose_network_test": {
+      "type": "string",
+      "ui_component": "text",
+      "label": "Test Network Definition",
+      "default": "{\"external\": false}",
+      "required": false,
+      "visible": false,
+      "schema": "compose.networks.test_network"
+    }
+  }
+}
+```
+
+### Network Definition Options
+
+The compose network definition field accepts a JSON string with Docker network options:
+
+**External Network:**
+```json
+"default": "{\"external\": true}"
+```
+- Network must already exist
+- Mastarr will not create or manage it
+- Use for connecting to existing networks
+
+**Internal Network:**
+```json
+"default": "{\"external\": false}"
+```
+- Network will be created by Docker Compose
+- Managed by the application stack
+- Removed when application is uninstalled
+
+**Advanced Network Configuration:**
+```json
+"default": "{\"driver\": \"bridge\", \"ipam\": {\"config\": [{\"subnet\": \"172.20.0.0/16\"}]}}"
+```
+- Specify custom driver
+- Define subnet and gateway
+- Configure network options
+
+### Result in Docker Compose
+
+The above configuration generates:
+
+```yaml
+services:
+  app_name:
+    networks:
+      mastarr_net:
+        ipv4_address: 10.21.12.3
+      test_network: {}  # DHCP - no static IP
+
+networks:
+  mastarr_net:
+    external: true
+  test_network:
+    external: false
+```
+
+### Key Points
+
+1. **Empty Network Config** - If you leave `ipv4_address` blank, the network config becomes `{}` which means "attach with DHCP"
+2. **Network Names** - Must match between the service field and compose definition
+3. **Multiple Networks** - Containers can attach to multiple networks for different purposes
+4. **External vs Internal** - Use `external: true` for pre-existing networks, `external: false` for compose-managed networks
+
+---
+
 ## Schema Routing
 
 The `schema` property determines where the input value is stored and used. It uses dot notation to specify the destination.
