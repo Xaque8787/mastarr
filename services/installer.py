@@ -169,8 +169,18 @@ class AppInstaller:
 
             compose_dict = compose_obj.model_dump(exclude_none=True)
 
+            # DEBUG: Log networks before cleaning
+            if 'services' in compose_dict:
+                for svc_name, svc_config in compose_dict['services'].items():
+                    logger.info(f"🔍 BEFORE clean: {svc_name} networks = {svc_config.get('networks')}")
+
             # Remove empty strings, empty dicts, and empty lists
             compose_dict = self._clean_empty_values(compose_dict)
+
+            # DEBUG: Log networks after cleaning
+            if 'services' in compose_dict:
+                for svc_name, svc_config in compose_dict['services'].items():
+                    logger.info(f"🔍 AFTER clean: {svc_name} networks = {svc_config.get('networks')}")
 
             if 'services' in compose_dict:
                 for service_name, service_config in compose_dict['services'].items():
@@ -301,13 +311,18 @@ class AppInstaller:
         blueprints = self.db.query(Blueprint).filter(Blueprint.name.in_(names)).all()
         return {bp.name: bp for bp in blueprints}
 
-    def _clean_empty_values(self, data):
+    def _clean_empty_values(self, data, parent_key=None):
         """
         Recursively remove empty strings, empty dicts, and empty lists from data.
         Keeps False and 0 as they are valid values.
 
+        Special case: Preserves empty dicts in 'networks' sections because
+        an empty dict like `test_network: {}` is valid in Docker Compose
+        (means attach to network with default settings).
+
         Args:
             data: Dictionary, list, or other value to clean
+            parent_key: Parent key name for context-aware cleaning
 
         Returns:
             Cleaned data structure
@@ -315,8 +330,24 @@ class AppInstaller:
         if isinstance(data, dict):
             cleaned = {}
             for key, value in data.items():
+                # Special case: Preserve empty dicts in networks sections
+                # e.g., networks: {test_network: {}} is valid and means "attach with defaults"
+                if key == 'networks' and isinstance(value, dict):
+                    # Keep networks dict and preserve empty network configs
+                    networks_cleaned = {}
+                    for net_name, net_config in value.items():
+                        # Clean the network config but keep it even if empty
+                        if isinstance(net_config, dict):
+                            net_config_cleaned = self._clean_empty_values(net_config, parent_key='network_config')
+                            # Keep the network entry even if config is empty dict
+                            networks_cleaned[net_name] = net_config_cleaned if net_config_cleaned else {}
+                        else:
+                            networks_cleaned[net_name] = net_config
+                    cleaned[key] = networks_cleaned
+                    continue
+
                 # Recursively clean nested structures
-                cleaned_value = self._clean_empty_values(value)
+                cleaned_value = self._clean_empty_values(value, parent_key=key)
 
                 # Skip empty strings, empty dicts, empty lists
                 # But keep False and 0 as they are valid values
@@ -329,7 +360,7 @@ class AppInstaller:
             return cleaned
         elif isinstance(data, list):
             # Clean each item in the list
-            return [self._clean_empty_values(item) for item in data if item not in ('', None)]
+            return [self._clean_empty_values(item, parent_key=parent_key) for item in data if item not in ('', None)]
         else:
             return data
 
