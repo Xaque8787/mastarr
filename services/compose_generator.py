@@ -342,7 +342,7 @@ class ComposeGenerator:
         Keeps False and 0 as they are valid values.
 
         Special case: Preserves empty dicts in 'networks' sections because
-        an empty dict like `test_network: {}` is valid in Docker Compose
+        an empty dict like `my_network: {}` is valid in Docker Compose
         (means attach to network with default settings).
 
         Args:
@@ -356,7 +356,7 @@ class ComposeGenerator:
             cleaned = {}
             for key, value in data.items():
                 # Special case: Preserve empty dicts in networks sections
-                # e.g., networks: {test_network: {}} is valid and means "attach with defaults"
+                # e.g., networks: {my_network: {}} is valid and means "attach with defaults"
                 if key == 'networks' and isinstance(value, dict):
                     # Keep networks dict and preserve empty network configs
                     networks_cleaned = {}

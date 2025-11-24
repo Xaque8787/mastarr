@@ -467,7 +467,7 @@ To add a custom network to your application, you need two fields:
         "network_name": {
           "type": "string",
           "label": "Network Name",
-          "default": "test_network"
+          "default": "my_custom_network"
         },
         "ipv4_address": {
           "type": "string",
@@ -479,14 +479,14 @@ To add a custom network to your application, you need two fields:
       "schema": "service.networks",
       "compose_transform": "network_config"
     },
-    "compose_network_test": {
+    "custom_network_definition": {
       "type": "string",
       "ui_component": "text",
-      "label": "Test Network Definition",
+      "label": "Custom Network Definition",
       "default": "{\"external\": false}",
       "required": false,
       "visible": false,
-      "schema": "compose.networks.test_network"
+      "schema": "compose.networks.my_custom_network"
     }
   }
 }
@@ -530,12 +530,12 @@ services:
     networks:
       mastarr_net:
         ipv4_address: 10.21.12.3
-      test_network: {}  # DHCP - no static IP
+      my_custom_network: {}  # DHCP - no static IP
 
 networks:
   mastarr_net:
     external: true
-  test_network:
+  my_custom_network:
     external: false
 ```
 
