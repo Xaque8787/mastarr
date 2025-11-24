@@ -694,6 +694,48 @@
                                 </div>
                             </template>
 
+                            <!-- Array Field (Compound Array) -->
+                            <template x-if="field.type === 'array' && field.ui_component === 'compound_array' && field.properties">
+                                <div class="array-field">
+                                    <label x-text="field.label"></label>
+                                    <p class="field-description" x-show="field.description" x-text="field.description"></p>
+
+                                    <template x-for="(item, index) in formData[fieldName]" :key="index">
+                                        <div class="array-item">
+                                            <template x-for="(propField, propName) in field.properties" :key="propName">
+                                                <div class="array-item-field">
+                                                    <label x-text="propField.label || propName"></label>
+                                                    <p x-show="propField.description" x-text="propField.description" style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;"></p>
+
+                                                    <!-- Handle select type -->
+                                                    <template x-if="propField.type === 'select' && propField.options">
+                                                        <select x-model="formData[fieldName][index][propName]">
+                                                            <template x-for="option in propField.options" :key="option.value">
+                                                                <option :value="option.value" x-text="option.label"></option>
+                                                            </template>
+                                                        </select>
+                                                    </template>
+
+                                                    <!-- Handle regular inputs -->
+                                                    <template x-if="propField.type !== 'select'">
+                                                        <input
+                                                            :type="propField.type === 'integer' ? 'number' : (propField.type === 'boolean' ? 'checkbox' : 'text')"
+                                                            :placeholder="propField.placeholder || ''"
+                                                            x-model="formData[fieldName][index][propName]"
+                                                        >
+                                                    </template>
+                                                </div>
+                                            </template>
+                                            <button type="button" class="btn-remove" @click="removeArrayItem(fieldName, index)">×</button>
+                                        </div>
+                                    </template>
+
+                                    <button type="button" class="btn-add" @click="addArrayItem(fieldName, createEmptyItemFromProperties(field.properties))">
+                                        + Add <span x-text="field.label.replace(/s$/, '')"></span>
+                                    </button>
+                                </div>
+                            </template>
+
                             <!-- Array Field (Port/Volume Mappings) -->
                             <template x-if="field.type === 'array' && field.item_schema && field.ui_component !== 'key_value_pairs'">
                                 <div class="array-field">
@@ -1506,6 +1548,14 @@
                     const item = {};
                     Object.keys(itemSchema).forEach(key => {
                         item[key] = itemSchema[key].default !== undefined ? itemSchema[key].default : '';
+                    });
+                    return item;
+                },
+
+                createEmptyItemFromProperties(properties) {
+                    const item = {};
+                    Object.keys(properties).forEach(key => {
+                        item[key] = properties[key].default !== undefined ? properties[key].default : '';
                     });
                     return item;
                 },
