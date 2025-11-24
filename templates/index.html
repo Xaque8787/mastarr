@@ -702,30 +702,63 @@
 
                                     <template x-for="(item, index) in formData[fieldName]" :key="index">
                                         <div class="array-item">
-                                            <template x-for="(propField, propName) in field.properties" :key="propName">
-                                                <div class="array-item-field">
-                                                    <label x-text="propField.label || propName"></label>
-                                                    <p x-show="propField.description" x-text="propField.description" style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;"></p>
-
-                                                    <!-- Handle select type -->
-                                                    <template x-if="propField.type === 'select' && propField.options">
-                                                        <select x-model="formData[fieldName][index][propName]">
-                                                            <template x-for="option in propField.options" :key="option.value">
-                                                                <option :value="option.value" x-text="option.label"></option>
-                                                            </template>
-                                                        </select>
-                                                    </template>
-
-                                                    <!-- Handle regular inputs -->
-                                                    <template x-if="propField.type !== 'select'">
-                                                        <input
-                                                            :type="propField.type === 'integer' ? 'number' : (propField.type === 'boolean' ? 'checkbox' : 'text')"
-                                                            :placeholder="propField.placeholder || ''"
-                                                            x-model="formData[fieldName][index][propName]"
-                                                        >
-                                                    </template>
+                                            <!-- Mode selection as radio buttons (if 'mode' property exists) -->
+                                            <template x-if="field.properties.mode">
+                                                <div class="array-item-field" style="margin-bottom: 12px;">
+                                                    <label x-text="field.properties.mode.label || 'mode'"></label>
+                                                    <div style="display: flex; gap: 16px; margin-top: 8px;">
+                                                        <template x-for="option in field.properties.mode.options" :key="option.value">
+                                                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                                                <input
+                                                                    type="radio"
+                                                                    :name="'mode_' + fieldName + '_' + index"
+                                                                    :value="option.value"
+                                                                    x-model="formData[fieldName][index]['mode']"
+                                                                    style="cursor: pointer;"
+                                                                >
+                                                                <span x-text="option.label"></span>
+                                                            </label>
+                                                        </template>
+                                                    </div>
                                                 </div>
                                             </template>
+
+                                            <!-- Network name input - show for 'create' mode or always if no mode -->
+                                            <template x-if="!field.properties.mode || formData[fieldName][index]['mode'] === 'create'">
+                                                <template x-if="field.properties.network_name">
+                                                    <div class="array-item-field">
+                                                        <label x-text="field.properties.network_name.label || 'network_name'"></label>
+                                                        <p x-show="field.properties.network_name.description" x-text="field.properties.network_name.description" style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;"></p>
+                                                        <input
+                                                            type="text"
+                                                            :placeholder="field.properties.network_name.placeholder || ''"
+                                                            x-model="formData[fieldName][index]['network_name']"
+                                                        >
+                                                    </div>
+                                                </template>
+                                            </template>
+
+                                            <!-- Docker network selector - show for 'existing' mode -->
+                                            <template x-if="field.properties.mode && formData[fieldName][index]['mode'] === 'existing'">
+                                                <div class="array-item-field">
+                                                    <label>Select Docker Network</label>
+                                                    <select
+                                                        x-model="formData[fieldName][index]['network_name']"
+                                                        @focus="if (availableNetworks.length === 0) loadDockerNetworks()"
+                                                    >
+                                                        <option value="">-- Select Network --</option>
+                                                        <template x-for="network in availableNetworks" :key="network.name">
+                                                            <option :value="network.name" x-text="network.name + ' (' + network.driver + ')'"></option>
+                                                        </template>
+                                                    </select>
+                                                    <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">
+                                                        <span x-show="loadingNetworks">Loading networks...</span>
+                                                        <span x-show="!loadingNetworks && availableNetworks.length === 0">No networks available</span>
+                                                        <span x-show="!loadingNetworks && availableNetworks.length > 0" x-text="availableNetworks.length + ' networks available'"></span>
+                                                    </p>
+                                                </div>
+                                            </template>
+
                                             <button type="button" class="btn-remove" @click="removeArrayItem(fieldName, index)">×</button>
                                         </div>
                                     </template>
@@ -1185,6 +1218,8 @@
                 presetError: null,
                 presetSuccess: null,
                 globalSettings: null,
+                availableNetworks: [],
+                loadingNetworks: false,
 
                 async init() {
                     await this.loadSystemInfo();
@@ -1558,6 +1593,25 @@
                         item[key] = properties[key].default !== undefined ? properties[key].default : '';
                     });
                     return item;
+                },
+
+                async loadDockerNetworks() {
+                    if (this.loadingNetworks) return;
+
+                    this.loadingNetworks = true;
+                    try {
+                        const response = await fetch('/api/system/docker-networks');
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch docker networks');
+                        }
+                        const data = await response.json();
+                        this.availableNetworks = data.networks || [];
+                    } catch (error) {
+                        console.error('Failed to load docker networks:', error);
+                        this.availableNetworks = [];
+                    } finally {
+                        this.loadingNetworks = false;
+                    }
                 },
 
                 async openSettingsModal() {

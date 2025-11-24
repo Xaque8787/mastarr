@@ -206,3 +206,38 @@ async def regenerate_affected_apps(db: Session = Depends(get_db)) -> Dict[str, A
         "regenerated": regenerated,
         "errors": errors if errors else None
     }
+
+
+@router.get("/docker-networks")
+async def list_docker_networks() -> Dict[str, Any]:
+    """
+    Get list of available Docker networks.
+    Filters out system networks (none, host) for cleaner UI.
+    """
+    try:
+        docker_client = docker.from_env()
+        networks = docker_client.networks.list()
+
+        network_list = []
+        for network in networks:
+            # Filter out system networks
+            if network.name in ['none', 'host']:
+                continue
+
+            network_list.append({
+                "name": network.name,
+                "id": network.id,
+                "driver": network.attrs.get("Driver", "unknown"),
+                "scope": network.attrs.get("Scope", "unknown")
+            })
+
+        # Sort by name for better UX
+        network_list.sort(key=lambda x: x["name"])
+
+        return {
+            "networks": network_list,
+            "count": len(network_list)
+        }
+    except Exception as e:
+        logger.error(f"Failed to list docker networks: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to list docker networks: {str(e)}")
