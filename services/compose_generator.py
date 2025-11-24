@@ -243,7 +243,7 @@ class ComposeGenerator:
 
                             result['environment'][key] = value
 
-        return result
+        return result, transform_cache
 
 
     def generate_env_file(self, app_name: str, user_inputs: Dict[str, Any], blueprint: Blueprint) -> str:
