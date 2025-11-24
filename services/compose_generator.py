@@ -52,14 +52,8 @@ class ComposeGenerator:
         # Build service config with transforms and globals applied
         service_config, transform_cache = self._build_service_config(app, blueprint, global_settings)
 
-        # DEBUG: Log networks before Pydantic validation
-        logger.info(f"🔍 service_config['networks'] BEFORE Pydantic: {service_config.get('networks')}")
-
         # Validate with Pydantic (this also transforms volumes/ports to proper format)
         service = ServiceSchema(**service_config)
-
-        # DEBUG: Log networks after Pydantic validation
-        logger.info(f"🔍 service.networks AFTER Pydantic: {service.networks}")
 
         # Build compose config from stored data
         compose_config = app.compose_data.copy() if app.compose_data else {}
@@ -125,10 +119,6 @@ class ComposeGenerator:
                         service_config['networks'][net_name].update(net_conf)
                     else:
                         service_config['networks'][net_name] = net_conf
-
-        # DEBUG: Log final networks before returning
-        logger.info(f"🔍 _build_service_config FINAL networks: {service_config.get('networks')}")
-        logger.info(f"🔍 transform_cache custom_networks: {transform_cache.get('custom_networks')}")
 
         return service_config, transform_cache
 
@@ -346,13 +336,18 @@ class ComposeGenerator:
 
         logger.info(f"✓ Compose file written to {output_path}")
 
-    def _clean_empty_values(self, data):
+    def _clean_empty_values(self, data, parent_key=None):
         """
         Recursively remove empty strings, empty dicts, and empty lists from data.
         Keeps False and 0 as they are valid values.
 
+        Special case: Preserves empty dicts in 'networks' sections because
+        an empty dict like `test_network: {}` is valid in Docker Compose
+        (means attach to network with default settings).
+
         Args:
             data: Dictionary, list, or other value to clean
+            parent_key: Parent key name for context-aware cleaning
 
         Returns:
             Cleaned data structure
@@ -360,8 +355,24 @@ class ComposeGenerator:
         if isinstance(data, dict):
             cleaned = {}
             for key, value in data.items():
+                # Special case: Preserve empty dicts in networks sections
+                # e.g., networks: {test_network: {}} is valid and means "attach with defaults"
+                if key == 'networks' and isinstance(value, dict):
+                    # Keep networks dict and preserve empty network configs
+                    networks_cleaned = {}
+                    for net_name, net_config in value.items():
+                        # Clean the network config but keep it even if empty
+                        if isinstance(net_config, dict):
+                            net_config_cleaned = self._clean_empty_values(net_config, parent_key='network_config')
+                            # Keep the network entry even if config is empty dict
+                            networks_cleaned[net_name] = net_config_cleaned if net_config_cleaned else {}
+                        else:
+                            networks_cleaned[net_name] = net_config
+                    cleaned[key] = networks_cleaned
+                    continue
+
                 # Recursively clean nested structures
-                cleaned_value = self._clean_empty_values(value)
+                cleaned_value = self._clean_empty_values(value, parent_key=key)
 
                 # Skip empty strings, empty dicts, empty lists
                 # But keep False and 0 as they are valid values
@@ -374,7 +385,7 @@ class ComposeGenerator:
             return cleaned
         elif isinstance(data, list):
             # Clean each item in the list
-            return [self._clean_empty_values(item) for item in data if item not in ('', None)]
+            return [self._clean_empty_values(item, parent_key=parent_key) for item in data if item not in ('', None)]
         else:
             return data
 

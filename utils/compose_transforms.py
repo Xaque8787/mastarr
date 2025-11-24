@@ -283,12 +283,7 @@ def transform_custom_networks_array(
         result: Service data dict to modify
         transform_cache: Cache to store networks for compose-level processing
     """
-    logger.info(f"🔍 transform_custom_networks_array called")
-    logger.info(f"  user_value type: {type(user_value)}")
-    logger.info(f"  user_value: {user_value}")
-
     if not isinstance(user_value, list):
-        logger.warning(f"  user_value is not a list, skipping")
         return
 
     if 'networks' not in result:
@@ -305,12 +300,8 @@ def transform_custom_networks_array(
         network_name = network_item.get('network_name')
         mode = network_item.get('mode', 'existing')
 
-        logger.info(f"  Processing network item: {network_item}")
-        logger.info(f"    network_name: '{network_name}', mode: '{mode}'")
-
         # Skip empty network names
         if not network_name or network_name == '':
-            logger.warning(f"    Skipping empty network name")
             continue
 
         # Create network via Docker API if mode is "create"
@@ -352,8 +343,7 @@ def transform_custom_networks_array(
             'mode': mode
         })
 
-        logger.info(f"✓ Added custom network '{network_name}' to service (mode: {mode})")
-        logger.info(f"  Service networks now: {list(result.get('networks', {}).keys())}")
+        logger.info(f"Added custom network '{network_name}' to service (mode: {mode})")
 
 
 # Transform registry - maps transform names to functions
