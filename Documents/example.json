@@ -274,40 +274,31 @@
       "advanced": false,
       "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
     },
-    "custom_network": {
-      "type": "object",
-      "label": "Custom Network",
-      "description": "Additional network for this container (optional)",
+    "custom_networks": {
+      "type": "array",
+      "ui_component": "compound_array",
+      "label": "Custom Networks",
+      "description": "Attach to additional Docker networks (e.g., VPN, monitoring)",
       "required": false,
       "visible": true,
       "advanced": true,
-      "fields": {
+      "properties": {
         "network_name": {
           "type": "string",
           "label": "Network Name",
-          "default": "",
-          "placeholder": "my_custom_network"
+          "placeholder": "vpn_network"
         },
-        "ipv4_address": {
-          "type": "string",
-          "label": "Static IP Address",
-          "default": "",
-          "placeholder": "Leave blank for DHCP"
+        "mode": {
+          "type": "select",
+          "label": "Mode",
+          "default": "existing",
+          "options": [
+            {"value": "existing", "label": "Use Existing Network"},
+            {"value": "create", "label": "Create If Missing"}
+          ]
         }
       },
-      "schema": "service.networks",
-      "compose_transform": "network_config"
-    },
-    "custom_network_definition": {
-      "type": "string",
-      "ui_component": "text",
-      "label": "Custom Network Definition (internal)",
-      "default": "{\"external\": false}",
-      "description": "Compose-level network definition. Set external:true for existing networks, false to create new. Only applies if custom_network.network_name is set.",
-      "required": false,
-      "visible": false,
-      "advanced": false,
-      "schema": "compose.networks.{custom_network.network_name}"
+      "compose_transform": "custom_networks_array"
     },
     "custom_environment": {
       "type": "array",
