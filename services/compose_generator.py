@@ -52,8 +52,14 @@ class ComposeGenerator:
         # Build service config with transforms and globals applied
         service_config, transform_cache = self._build_service_config(app, blueprint, global_settings)
 
+        # DEBUG: Log networks before Pydantic validation
+        logger.info(f"🔍 service_config['networks'] BEFORE Pydantic: {service_config.get('networks')}")
+
         # Validate with Pydantic (this also transforms volumes/ports to proper format)
         service = ServiceSchema(**service_config)
+
+        # DEBUG: Log networks after Pydantic validation
+        logger.info(f"🔍 service.networks AFTER Pydantic: {service.networks}")
 
         # Build compose config from stored data
         compose_config = app.compose_data.copy() if app.compose_data else {}
@@ -119,6 +125,10 @@ class ComposeGenerator:
                         service_config['networks'][net_name].update(net_conf)
                     else:
                         service_config['networks'][net_name] = net_conf
+
+        # DEBUG: Log final networks before returning
+        logger.info(f"🔍 _build_service_config FINAL networks: {service_config.get('networks')}")
+        logger.info(f"🔍 transform_cache custom_networks: {transform_cache.get('custom_networks')}")
 
         return service_config, transform_cache
 
