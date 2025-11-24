@@ -12,10 +12,10 @@ Allows apps to attach to additional Docker networks beyond the primary network c
 - Isolated communication networks
 
 ### Dry-Run Mode
-Allows testing compose file generation without actually writing files or running `docker compose up`. Perfect for:
+Allows testing compose file generation without running `docker compose up`. Compose files are still written to disk but containers aren't started. Perfect for:
 - Development and debugging
 - Validating blueprint changes
-- Testing new features locally
+- Inspecting generated compose files without side effects
 
 ## Transform Registry Architecture
 
@@ -173,50 +173,64 @@ compose_config['networks'] = {
 
 ### Usage
 
-**Initialize ComposeGenerator with dry_run flag:**
-```python
-generator = ComposeGenerator(dry_run=True)
-compose = generator.generate(app, blueprint)
-generator.write_compose_file(compose, output_path)
+**Set environment variable in `.env` file:**
+```bash
+DRY_RUN=true
+```
+
+Or set it at runtime:
+```bash
+export DRY_RUN=true
+docker-compose up
 ```
 
 ### Behavior
 
-**When dry_run=True:**
-- `write_compose_file()` prints to console instead of writing file
-- Shows full compose YAML with formatting
-- Logs `[DRY RUN]` prefix for clarity
-- Does NOT execute `docker compose up`
+**When DRY_RUN=true:**
+- Compose files are generated and written to disk normally
+- All blueprints and validations run as usual
+- Container startup is SKIPPED (no `docker compose up`)
+- Logs show: `🔍 DRY RUN MODE: Skipping container startup for {app_name}`
 
-**Output Format:**
-```
-[DRY RUN] Would write compose file to /path/to/docker-compose.yml
-================================================================================
-COMPOSE FILE: /path/to/docker-compose.yml
-================================================================================
+**When DRY_RUN=false (default):**
+- Full installation: compose files written AND containers started
+- Normal production behavior
+
+### Benefits
+
+1. **Inspect Generated Files**: Check compose YAML before containers start
+2. **Validate Blueprints**: Test blueprint changes without side effects
+3. **Development Testing**: Verify transform logic without Docker overhead
+4. **Safe Experimentation**: Test custom networks without affecting running services
+
+### Environment Variable
+
+The `DRY_RUN` variable is passed to the application container via docker-compose.yml:
+
+```yaml
 services:
-  jellyfin:
-    image: jellyfin/jellyfin:latest
-    ...
-================================================================================
+  mastarr:
+    environment:
+      - DRY_RUN=${DRY_RUN:-false}
 ```
 
 ### Testing Locally
 
-**Example test script:**
-```python
-from models.database import get_session, App, Blueprint
-from services.compose_generator import ComposeGenerator
-
-db = get_session()
-blueprint = db.query(Blueprint).filter(Blueprint.name == "jellyfin").first()
-app = db.query(App).filter(App.blueprint_name == "jellyfin").first()
-
-# Generate compose in dry-run mode
-generator = ComposeGenerator(dry_run=True)
-compose = generator.generate(app, blueprint)
-generator.write_compose_file(compose, f"/tmp/{app.db_name}/docker-compose.yml")
+**Set dry-run in .env:**
+```bash
+# .env file
+DRY_RUN=true
 ```
+
+**Start application:**
+```bash
+docker-compose up
+```
+
+**Try installing an app via UI:**
+- Compose file will be created at `/var/lib/mastarr/stacks/{app_name}/docker-compose.yml`
+- Check logs for: `🔍 DRY RUN MODE: Skipping container startup`
+- Inspect generated compose file to verify custom networks
 
 ## Adding New Transforms
 
@@ -287,9 +301,9 @@ TRANSFORM_REGISTRY = {
 
 ### Dry-Run Mode
 
-1. **Always test locally**: Run with dry_run=True before deploying
-2. **Check compose output**: Verify all fields are generated correctly
-3. **Validate networks**: Ensure external networks are marked correctly
+1. **Always test locally**: Set DRY_RUN=true before deploying changes
+2. **Check compose output**: Inspect generated files in `/var/lib/mastarr/stacks/`
+3. **Validate networks**: Ensure external networks are marked correctly in compose files
 4. **Test empty cases**: Verify behavior when optional fields are omitted
 
 ## Troubleshooting
@@ -315,12 +329,13 @@ TRANSFORM_REGISTRY = {
 - Use `docker network inspect <name>` to check status
 - Use `mode: "existing"` if network exists
 
-### Dry-Run Not Printing Output
+### Dry-Run Not Working
 
 **Check:**
-1. Is `dry_run=True` passed to ComposeGenerator constructor?
-2. Are you calling `write_compose_file()`?
-3. Check logger level (should see INFO messages)
+1. Is `DRY_RUN=true` set in `.env` file or environment?
+2. Check logs for `🔍 DRY RUN MODE: Skipping container startup` message
+3. Verify docker-compose.yml passes DRY_RUN variable to container
+4. Check logger level (should see INFO messages)
 
 ### Transform Not Running
 

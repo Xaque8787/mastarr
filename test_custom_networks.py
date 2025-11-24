@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Test script for custom networks feature with dry-run mode.
+Test script for custom networks feature.
 Tests the transform registry and custom_networks_array transform.
+
+Note: This script requires database access. For dry-run testing,
+set DRY_RUN=true in .env file before starting the application.
 """
 
 import sys
@@ -11,12 +14,13 @@ sys.path.insert(0, os.path.dirname(__file__))
 from models.database import get_session, App, Blueprint
 from services.compose_generator import ComposeGenerator
 from utils.logger import get_logger
+import yaml
 
 logger = get_logger("test_custom_networks")
 
 
 def test_custom_networks():
-    """Test custom networks transform with dry-run mode"""
+    """Test custom networks transform"""
 
     logger.info("="*80)
     logger.info("TESTING CUSTOM NETWORKS FEATURE")
@@ -54,8 +58,6 @@ def test_custom_networks():
             logger.info("Creating a test scenario with mock data...")
 
             # Create mock app for testing
-            from models.schemas import AppSchema
-
             mock_app = App(
                 name="test-jellyfin",
                 db_name="test_jellyfin",
@@ -85,25 +87,55 @@ def test_custom_networks():
             logger.info(f"\nUsing existing app: {app.name}")
             logger.info(f"Current raw_inputs keys: {list(app.raw_inputs.keys())}")
 
-        # Test with dry-run mode
+        # Generate compose file
         logger.info("\n" + "="*80)
-        logger.info("GENERATING COMPOSE FILE (DRY RUN MODE)")
+        logger.info("GENERATING COMPOSE FILE")
         logger.info("="*80 + "\n")
 
-        generator = ComposeGenerator(dry_run=True)
+        # Check DRY_RUN setting
+        dry_run = os.getenv('DRY_RUN', 'false').lower() in ('true', '1', 'yes')
+        if dry_run:
+            logger.info("🔍 DRY_RUN mode detected - compose file will be written but container won't start")
+
+        generator = ComposeGenerator()
         compose = generator.generate(mock_app, blueprint)
 
-        # Write to console (dry-run will print it)
+        # Display generated compose structure
+        logger.info("\n📄 Generated Compose Structure:")
+        compose_dict = compose.model_dump(exclude_none=True)
+
+        # Show service networks
+        if 'services' in compose_dict:
+            for service_name, service_config in compose_dict['services'].items():
+                if 'networks' in service_config:
+                    logger.info(f"\n  Service '{service_name}' networks:")
+                    for net_name, net_config in service_config['networks'].items():
+                        logger.info(f"    - {net_name}: {net_config}")
+
+        # Show compose-level networks
+        if 'networks' in compose_dict:
+            logger.info(f"\n  Compose-level networks:")
+            for net_name, net_config in compose_dict['networks'].items():
+                logger.info(f"    - {net_name}: {net_config}")
+
+        # Write compose file (will be created regardless of DRY_RUN)
         output_path = f"/tmp/{mock_app.db_name}/docker-compose.yml"
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         generator.write_compose_file(compose, output_path)
 
         logger.info("\n" + "="*80)
         logger.info("TEST COMPLETED")
         logger.info("="*80)
-        logger.info("\nCheck the output above to verify:")
-        logger.info("1. Service-level networks includes custom networks")
-        logger.info("2. Compose-level networks section has custom networks marked as external")
-        logger.info("3. Existing network_config functionality still works")
+        logger.info("\nVerify:")
+        logger.info(f"1. Check generated file: {output_path}")
+        logger.info("2. Service-level networks includes custom networks")
+        logger.info("3. Compose-level networks section has custom networks marked as external")
+        logger.info("4. Existing network_config functionality still works")
+
+        if dry_run:
+            logger.info("\n💡 DRY_RUN=true: Container startup will be skipped by installer")
+        else:
+            logger.info("\n💡 Set DRY_RUN=true in .env to skip container startup")
 
     except Exception as e:
         logger.error(f"Error during test: {e}")

@@ -28,10 +28,9 @@ class ComposeGenerator:
     the blueprint schema definitions and user inputs.
     """
 
-    def __init__(self, dry_run: bool = False):
+    def __init__(self):
         self.db = get_session()
         self.path_resolver = PathResolver()
-        self.dry_run = dry_run
 
     def generate(self, app: App, blueprint: Blueprint) -> ComposeSchema:
         """
@@ -332,17 +331,10 @@ class ComposeGenerator:
                         f"{k}={v}" for k, v in service_config['environment'].items()
                     ]
 
-        if self.dry_run:
-            logger.info(f"[DRY RUN] Would write compose file to {output_path}")
-            logger.info("\n" + "="*80)
-            logger.info(f"COMPOSE FILE: {output_path}")
-            logger.info("="*80)
-            print(yaml.dump(compose_dict, default_flow_style=False, sort_keys=False))
-            logger.info("="*80 + "\n")
-        else:
-            with open(output_path, 'w') as f:
-                yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
-            logger.info(f"✓ Compose file written to {output_path}")
+        with open(output_path, 'w') as f:
+            yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
+
+        logger.info(f"✓ Compose file written to {output_path}")
 
     def _clean_empty_values(self, data):
         """
