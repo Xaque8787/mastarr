@@ -390,6 +390,32 @@
       "visible": false,
       "advanced": false,
       "schema": "compose.networks.${GLOBAL.NETWORK_NAME}"
+    },
+    "custom_networks": {
+      "type": "array",
+      "ui_component": "compound_array",
+      "label": "Custom Networks",
+      "description": "Attach to additional Docker networks (e.g., VPN, monitoring)",
+      "required": false,
+      "visible": true,
+      "advanced": true,
+      "properties": {
+        "network_name": {
+          "type": "string",
+          "label": "Network Name",
+          "placeholder": "vpn_network"
+        },
+        "mode": {
+          "type": "select",
+          "label": "Mode",
+          "default": "existing",
+          "options": [
+            {"value": "existing", "label": "Use Existing Network"},
+            {"value": "create", "label": "Create If Missing"}
+          ]
+        }
+      },
+      "compose_transform": "custom_networks_array"
     }
   }
 }

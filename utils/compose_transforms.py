@@ -1,225 +1,393 @@
-from typing import Dict, Any, Union, Tuple, Optional
+"""
+Compose transform functions for converting user inputs to Docker Compose format.
+
+Each transform is a pure function that takes user input and returns compose-formatted output.
+Transforms are registered in TRANSFORM_REGISTRY and called by compose_generator.py.
+"""
+
+from typing import Dict, Any, Optional
+import subprocess
+from utils.logger import get_logger
+
+logger = get_logger("mastarr.compose_transforms")
 
 
-def parse_short_form_volume(volume_str: str) -> Tuple[str, str, Optional[str]]:
+def transform_port_mapping(
+    user_value: Any,
+    field_schema: Dict[str, Any],
+    app: Any,
+    result: Dict[str, Any],
+    transform_cache: Dict[str, Any]
+) -> None:
     """
-    Parse short-form volume string into (source, target, options).
+    Transform port mapping input to Docker Compose port format.
 
-    Strategy: Find the first ':/' pattern - everything before is source,
-    everything after is destination (and optional options).
+    Handles compound field: {host: 8096, container: 8096, protocol: "tcp"}
+    Converts to: {"published": 8096, "target": 8096, "protocol": "tcp"}
 
     Args:
-        volume_str: Short-form volume string (e.g., "./config:/config:ro")
-
-    Returns:
-        Tuple of (source, target, options)
-
-    Examples:
-        "./config:/config" → ("./config", "/config", None)
-        "./config:/config:ro" → ("./config", "/config", "ro")
-        "/path/with:colon:/app" → ("/path/with:colon", "/app", None)
-        "/path/with:colon:/app:ro,shared" → ("/path/with:colon", "/app", "ro,shared")
+        user_value: User input (dict with host/container/protocol keys)
+        field_schema: Blueprint field schema
+        app: App instance with raw_inputs
+        result: Service data dict to modify
+        transform_cache: Cache to prevent duplicate processing
     """
-    idx = volume_str.find(':/')
+    # Handle compound field (object with host/container/protocol)
+    if isinstance(user_value, dict) and 'host' in user_value and 'container' in user_value:
+        if 'ports' not in result:
+            result['ports'] = []
 
-    if idx == -1:
-        raise ValueError(f"Invalid volume format (no container path): {volume_str}")
+        port_dict = {
+            "published": user_value['host'],
+            "target": user_value['container'],
+            "protocol": user_value.get('protocol', 'tcp')
+        }
+        result['ports'].append(port_dict)
 
-    source = volume_str[:idx]
-    remainder = volume_str[idx+1:]
+    # Legacy handling: separate host_port and container_port fields
+    elif 'port_mapping' not in transform_cache:
+        host_port = app.raw_inputs.get('host_port')
+        container_port = app.raw_inputs.get('container_port')
 
-    dest_parts = remainder.split(':', 1)
-    destination = dest_parts[0]
-    options = dest_parts[1] if len(dest_parts) > 1 else None
+        if host_port and container_port:
+            if 'ports' not in result:
+                result['ports'] = []
 
-    return (source, destination, options)
+            port_dict = {
+                "published": host_port,
+                "target": container_port,
+                "protocol": "tcp"
+            }
+            result['ports'].append(port_dict)
+            transform_cache['port_mapping'] = True
 
 
-def transform_volume_to_long_form(volume_definition: Union[Dict[str, Any], str]) -> Dict[str, Any]:
+def transform_port_array(
+    user_value: Any,
+    field_schema: Dict[str, Any],
+    app: Any,
+    result: Dict[str, Any],
+    transform_cache: Dict[str, Any]
+) -> None:
     """
-    Transform volume to long-form syntax with HOST_PATH for relative paths.
+    Transform array of port objects to Docker Compose port format.
 
-    Args:
-        volume_definition: Either a short-form string or already long-form dict
+    Input: [{"host": 8096, "container": 8096, "protocol": "tcp"}, ...]
+    Output: [{"published": 8096, "target": 8096, "protocol": "tcp"}, ...]
 
-    Returns:
-        Dictionary with long-form volume definition
+    Skips empty port mappings where host or container is empty.
+    """
+    if not isinstance(user_value, list):
+        return
 
-    Examples:
-        "./config:/config:ro" →
-        {
+    if 'ports' not in result:
+        result['ports'] = []
+
+    for port_item in user_value:
+        if isinstance(port_item, dict) and 'host' in port_item and 'container' in port_item:
+            # Skip empty port mappings
+            host = port_item['host']
+            container = port_item['container']
+
+            # Skip if either value is empty string or None
+            if not host or not container or host == '' or container == '':
+                continue
+
+            port_dict = {
+                "published": port_item['host'],
+                "target": port_item['container'],
+                "protocol": port_item.get('protocol', 'tcp')
+            }
+            result['ports'].append(port_dict)
+
+
+def transform_volume_mapping(
+    user_value: Any,
+    field_schema: Dict[str, Any],
+    app: Any,
+    result: Dict[str, Any],
+    transform_cache: Dict[str, Any]
+) -> None:
+    """
+    Transform volume mapping input to Docker Compose volume format.
+
+    Handles compound field: {source: "./config", target: "/config", type: "bind"}
+    Supports bind options like propagation and create_host_path.
+
+    Legacy mode: If user_value is a string, uses volume_target from field_schema.
+    """
+    # Handle compound field (object with source/target)
+    if isinstance(user_value, dict) and 'source' in user_value and 'target' in user_value:
+        if 'volumes' not in result:
+            result['volumes'] = []
+
+        volume_dict = {
+            "type": user_value.get('type', 'bind'),
+            "source": user_value['source'],
+            "target": user_value['target']
+        }
+
+        # Only add read_only if explicitly set to True
+        if user_value.get('read_only'):
+            volume_dict['read_only'] = True
+
+        # Handle bind-specific options
+        if volume_dict['type'] == 'bind':
+            bind_options = {}
+            if user_value.get('bind_propagation'):
+                bind_options['propagation'] = user_value['bind_propagation']
+            if 'bind_create_host_path' in user_value and user_value['bind_create_host_path'] is not None:
+                bind_options['create_host_path'] = user_value['bind_create_host_path']
+
+            if bind_options:
+                volume_dict['bind'] = bind_options
+
+        result['volumes'].append(volume_dict)
+
+    # Legacy handling: volume_target from field_schema
+    elif isinstance(user_value, str):
+        volume_target = field_schema.get('volume_target', '/data')
+
+        if 'volumes' not in result:
+            result['volumes'] = []
+
+        volume_dict = {
             "type": "bind",
-            "source": "${HOST_PATH}/config",
-            "target": "/config",
-            "read_only": True
+            "source": user_value,
+            "target": volume_target,
+            "read_only": False
         }
+        result['volumes'].append(volume_dict)
+
+
+def transform_volume_array(
+    user_value: Any,
+    field_schema: Dict[str, Any],
+    app: Any,
+    result: Dict[str, Any],
+    transform_cache: Dict[str, Any]
+) -> None:
     """
-    if isinstance(volume_definition, dict):
-        return transform_long_form_volume(volume_definition)
+    Transform array of volume objects to Docker Compose volume format.
 
-    source, target, options = parse_short_form_volume(volume_definition)
-
-    long_form = {
-        "type": "bind",
-        "target": target
-    }
-
-    if source.startswith('./'):
-        long_form["source"] = f"${{HOST_PATH}}/{source[2:]}"
-    else:
-        long_form["source"] = source
-
-    if options:
-        options_lower = options.lower()
-        if 'ro' in options_lower:
-            long_form["read_only"] = True
-
-        if 'shared' in options_lower or 'slave' in options_lower or 'private' in options_lower:
-            if "bind" not in long_form:
-                long_form["bind"] = {}
-
-            if 'rshared' in options_lower:
-                long_form["bind"]["propagation"] = "rshared"
-            elif 'rslave' in options_lower:
-                long_form["bind"]["propagation"] = "rslave"
-            elif 'rprivate' in options_lower:
-                long_form["bind"]["propagation"] = "rprivate"
-            elif 'shared' in options_lower:
-                long_form["bind"]["propagation"] = "shared"
-            elif 'slave' in options_lower:
-                long_form["bind"]["propagation"] = "slave"
-            elif 'private' in options_lower:
-                long_form["bind"]["propagation"] = "private"
-
-    return long_form
-
-
-def transform_long_form_volume(volume_def: Dict[str, Any]) -> Dict[str, Any]:
+    Handles relative paths by prepending ${HOST_PATH}/ for bind mounts.
+    Skips empty volume mappings where source or target is empty.
     """
-    Transform already long-form volume definition.
-    Updates source path to use HOST_PATH if relative.
+    if not isinstance(user_value, list):
+        return
+
+    if 'volumes' not in result:
+        result['volumes'] = []
+
+    for volume_item in user_value:
+        if isinstance(volume_item, dict) and 'source' in volume_item and 'target' in volume_item:
+            # Skip empty volume mappings
+            source = volume_item['source']
+            target = volume_item['target']
+
+            # Skip if either value is empty string or None
+            if not source or not target or source == '' or target == '':
+                continue
+
+            volume_type = volume_item.get('type', 'bind')
+
+            # Apply HOST_PATH prepending for bind mounts with relative paths
+            if volume_type == 'bind' and source.startswith('./'):
+                source = f"${{HOST_PATH}}/{source[2:]}"
+
+            volume_dict = {
+                "type": volume_type,
+                "source": source,
+                "target": target
+            }
+
+            # Only add read_only if explicitly set to True
+            if volume_item.get('read_only'):
+                volume_dict['read_only'] = True
+
+            # Handle bind-specific options
+            if volume_type == 'bind':
+                bind_options = {}
+                if volume_item.get('bind_propagation'):
+                    bind_options['propagation'] = volume_item['bind_propagation']
+                if 'bind_create_host_path' in volume_item and volume_item['bind_create_host_path'] is not None:
+                    bind_options['create_host_path'] = volume_item['bind_create_host_path']
+
+                if bind_options:
+                    volume_dict['bind'] = bind_options
+
+            result['volumes'].append(volume_dict)
+
+
+def transform_network_config(
+    user_value: Any,
+    field_schema: Dict[str, Any],
+    app: Any,
+    result: Dict[str, Any],
+    transform_cache: Dict[str, Any]
+) -> None:
+    """
+    Transform network configuration to Docker Compose network format.
+
+    Input: {network_name: "mastarr_net", ipv4_address: "10.21.12.3"}
+    Output: {"mastarr_net": {"ipv4_address": "10.21.12.3"}}
+
+    This is for the existing single network field (service-level).
+    """
+    if not isinstance(user_value, dict):
+        return
+
+    network_name = user_value.get('network_name')
+    ipv4_address = user_value.get('ipv4_address')
+
+    if network_name:
+        if 'networks' not in result:
+            result['networks'] = {}
+
+        # Add network with optional IP configuration
+        if ipv4_address:
+            result['networks'][network_name] = {
+                'ipv4_address': ipv4_address
+            }
+        else:
+            # Network without specific config (use dict to allow merge)
+            result['networks'][network_name] = {}
+
+
+def transform_custom_networks_array(
+    user_value: Any,
+    field_schema: Dict[str, Any],
+    app: Any,
+    result: Dict[str, Any],
+    transform_cache: Dict[str, Any]
+) -> None:
+    """
+    Transform custom networks array to Docker Compose network format.
+
+    Handles network creation via Docker API and compose configuration.
+
+    Input: [
+        {"network_name": "vpn_net", "mode": "create"},
+        {"network_name": "monitoring", "mode": "existing"}
+    ]
+
+    Side effects:
+        - Creates networks via Docker API if mode == "create"
+        - Stores network info in transform_cache for compose-level networks
+        - Adds to service-level networks
 
     Args:
-        volume_def: Long-form volume dictionary
-
-    Returns:
-        Transformed volume dictionary
+        user_value: Array of network objects
+        field_schema: Blueprint field schema
+        app: App instance
+        result: Service data dict to modify
+        transform_cache: Cache to store networks for compose-level processing
     """
-    transformed = volume_def.copy()
+    if not isinstance(user_value, list):
+        return
 
-    source = transformed.get("source", "")
+    if 'networks' not in result:
+        result['networks'] = {}
 
-    if source.startswith('./'):
-        transformed["source"] = f"${{HOST_PATH}}/{source[2:]}"
+    # Store custom networks in cache for compose-level processing
+    if 'custom_networks' not in transform_cache:
+        transform_cache['custom_networks'] = []
 
-    return transformed
+    for network_item in user_value:
+        if not isinstance(network_item, dict) or 'network_name' not in network_item:
+            continue
+
+        network_name = network_item['network_name']
+        mode = network_item.get('mode', 'existing')
+
+        # Skip empty network names
+        if not network_name or network_name == '':
+            continue
+
+        # Create network via Docker API if mode is "create"
+        if mode == 'create':
+            try:
+                # Check if network already exists
+                inspect = subprocess.run(
+                    ["docker", "network", "inspect", network_name],
+                    capture_output=True,
+                    text=True
+                )
+
+                if inspect.returncode != 0:
+                    # Network doesn't exist, create it
+                    create_result = subprocess.run(
+                        ["docker", "network", "create", network_name],
+                        capture_output=True,
+                        text=True
+                    )
+
+                    if create_result.returncode == 0:
+                        logger.info(f"Created custom network: {network_name}")
+                    else:
+                        logger.error(f"Failed to create network {network_name}: {create_result.stderr}")
+                        continue
+                else:
+                    logger.info(f"Network {network_name} already exists, reusing")
+
+            except Exception as e:
+                logger.error(f"Error creating network {network_name}: {e}")
+                continue
+
+        # Add to service-level networks (simple attach, no IP config)
+        result['networks'][network_name] = {}
+
+        # Store in cache for compose-level networks section
+        transform_cache['custom_networks'].append({
+            'name': network_name,
+            'mode': mode
+        })
+
+        logger.debug(f"Added custom network to service: {network_name} (mode: {mode})")
 
 
-def parse_short_form_port(port_definition: Union[str, int]) -> Dict[str, Any]:
+# Transform registry - maps transform names to functions
+TRANSFORM_REGISTRY = {
+    'port_mapping': transform_port_mapping,
+    'port_array': transform_port_array,
+    'volume_mapping': transform_volume_mapping,
+    'volume_array': transform_volume_array,
+    'network_config': transform_network_config,
+    'custom_networks_array': transform_custom_networks_array,
+}
+
+
+def apply_transform(
+    transform_type: str,
+    user_value: Any,
+    field_schema: Dict[str, Any],
+    app: Any,
+    result: Dict[str, Any],
+    transform_cache: Dict[str, Any]
+) -> None:
     """
-    Parse short-form port string/int into components.
+    Apply a transform function to convert user input to compose format.
 
     Args:
-        port_definition: Short-form port (e.g., "8096:8096", "127.0.0.1:8080:8080", "7359:7359/udp")
+        transform_type: Name of transform (e.g., "port_mapping")
+        user_value: User input value from raw_inputs
+        field_schema: Blueprint field schema
+        app: App instance
+        result: Service data dict to modify (mutated in place)
+        transform_cache: Cache to prevent duplicate processing and store shared data
 
-    Returns:
-        Dictionary with parsed port components
-
-    Examples:
-        "8096" → {"target": 8096, "published": 8096, "protocol": "tcp"}
-        "8096:8096" → {"target": 8096, "published": 8096, "protocol": "tcp"}
-        "127.0.0.1:8080:8080" → {"target": 8080, "published": 8080, "host_ip": "127.0.0.1", "protocol": "tcp"}
-        "7359:7359/udp" → {"target": 7359, "published": 7359, "protocol": "udp"}
+    Raises:
+        ValueError: If transform_type not found in registry
     """
-    port_str = str(port_definition)
+    transform_func = TRANSFORM_REGISTRY.get(transform_type)
 
-    host_ip = None
-    published = None
-    target = None
-    protocol = "tcp"
+    if not transform_func:
+        logger.warning(f"Unknown transform type: {transform_type}")
+        return
 
-    if '/' in port_str:
-        port_str, protocol = port_str.split('/', 1)
-
-    parts = port_str.split(':')
-
-    if len(parts) == 1:
-        target = int(parts[0])
-        published = target
-    elif len(parts) == 2:
-        published = int(parts[0])
-        target = int(parts[1])
-    elif len(parts) == 3:
-        host_ip = parts[0]
-        published = int(parts[1])
-        target = int(parts[2])
-    else:
-        raise ValueError(f"Invalid port format: {port_definition}")
-
-    long_form = {
-        "target": target,
-        "published": published,
-        "protocol": protocol
-    }
-
-    if host_ip:
-        long_form["host_ip"] = host_ip
-
-    return long_form
+    transform_func(user_value, field_schema, app, result, transform_cache)
 
 
-def transform_port_to_long_form(port_definition: Union[Dict[str, Any], str, int]) -> Dict[str, Any]:
-    """
-    Transform port to long-form syntax.
-
-    Args:
-        port_definition: Short-form string/int or already long-form dict
-
-    Returns:
-        Dictionary with long-form port definition
-
-    Examples:
-        "8096:8096" →
-        {
-            "target": 8096,
-            "published": 8096,
-            "protocol": "tcp"
-        }
-    """
-    if isinstance(port_definition, dict):
-        return port_definition
-
-    return parse_short_form_port(port_definition)
-
-
-def transform_user_format(user_input: Union[str, int, Dict[str, int]]) -> str:
-    """
-    Transform user input into Docker user format (PUID:PGID).
-
-    Args:
-        user_input: Can be:
-            - String: "1000:1000" (already formatted)
-            - String: "1000" (just PUID, will duplicate)
-            - Int: 1000 (just PUID, will duplicate)
-            - Dict: {"puid": 1000, "pgid": 1000}
-
-    Returns:
-        Formatted user string: "1000:1000"
-
-    Examples:
-        "1000:1000" → "1000:1000"
-        "1000" → "1000:1000"
-        1000 → "1000:1000"
-        {"puid": 1000, "pgid": 1001} → "1000:1001"
-    """
-    if isinstance(user_input, dict):
-        puid = user_input.get("puid", user_input.get("PUID", 1000))
-        pgid = user_input.get("pgid", user_input.get("PGID", 1000))
-        return f"{puid}:{pgid}"
-
-    user_str = str(user_input)
-
-    if ":" in user_str:
-        return user_str
-
-    return f"{user_str}:{user_str}"
+def get_available_transforms():
+    """Return list of available transform names."""
+    return list(TRANSFORM_REGISTRY.keys())

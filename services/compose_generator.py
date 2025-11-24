@@ -14,6 +14,7 @@ from models.schemas import (
 from models.database import App, Blueprint, GlobalSettings, get_session
 from utils.logger import get_logger
 from utils.path_resolver import PathResolver
+from utils.compose_transforms import apply_transform
 
 logger = get_logger("mastarr.compose_generator")
 
@@ -27,9 +28,10 @@ class ComposeGenerator:
     the blueprint schema definitions and user inputs.
     """
 
-    def __init__(self):
+    def __init__(self, dry_run: bool = False):
         self.db = get_session()
         self.path_resolver = PathResolver()
+        self.dry_run = dry_run
 
     def generate(self, app: App, blueprint: Blueprint) -> ComposeSchema:
         """
@@ -49,7 +51,7 @@ class ComposeGenerator:
         global_settings = self.db.query(GlobalSettings).first()
 
         # Build service config with transforms and globals applied
-        service_config = self._build_service_config(app, blueprint, global_settings)
+        service_config, transform_cache = self._build_service_config(app, blueprint, global_settings)
 
         # Validate with Pydantic (this also transforms volumes/ports to proper format)
         service = ServiceSchema(**service_config)
@@ -58,24 +60,38 @@ class ComposeGenerator:
         compose_config = app.compose_data.copy() if app.compose_data else {}
         compose_config['services'] = {app.db_name: service}
 
+        # Add custom networks to compose-level networks section
+        if 'custom_networks' in transform_cache:
+            if 'networks' not in compose_config:
+                compose_config['networks'] = {}
+
+            for network_info in transform_cache['custom_networks']:
+                network_name = network_info['name']
+                # Mark all custom networks as external (they exist outside compose)
+                compose_config['networks'][network_name] = {'external': True}
+                logger.debug(f"Added compose-level network: {network_name} (external: true)")
+
         # Validate complete compose structure
         compose = ComposeSchema(**compose_config)
 
         logger.info(f"✓ Compose generated for {app.name}")
         return compose
 
-    def _build_service_config(self, app: App, blueprint: Blueprint, global_settings: GlobalSettings) -> Dict[str, Any]:
+    def _build_service_config(self, app: App, blueprint: Blueprint, global_settings: GlobalSettings):
         """
         Build service configuration from service_data and apply compose_transforms.
         Injects global values for fields that support use_global and are not present in service_data.
+
+        Returns:
+            Tuple of (service_config, transform_cache)
         """
         service_config = app.service_data.copy() if app.service_data else {}
 
         # Inject global values for missing fields that support use_global
         service_config = self._inject_global_values(service_config, blueprint, global_settings)
 
-        # Apply compose_transform functions
-        service_config = self._apply_transforms(service_config, blueprint, app)
+        # Apply compose_transform functions and get transform cache
+        service_config, transform_cache = self._apply_transforms(service_config, blueprint, app)
 
         # Append :${TAG:-latest} to image if no tag/variable present
         if 'image' in service_config:
@@ -105,7 +121,7 @@ class ComposeGenerator:
                     else:
                         service_config['networks'][net_name] = net_conf
 
-        return service_config
+        return service_config, transform_cache
 
     def _inject_global_values(
         self,
@@ -198,166 +214,15 @@ class ComposeGenerator:
             if user_value is None:
                 continue
 
-            if transform_type == 'port_mapping':
-                # Handle compound field (object with host/container/protocol)
-                if isinstance(user_value, dict) and 'host' in user_value and 'container' in user_value:
-                    if 'ports' not in result:
-                        result['ports'] = []
-
-                    port_dict = {
-                        "published": user_value['host'],
-                        "target": user_value['container'],
-                        "protocol": user_value.get('protocol', 'tcp')
-                    }
-                    result['ports'].append(port_dict)
-
-                # Legacy handling: separate host_port and container_port fields
-                elif 'port_mapping' not in transform_cache:
-                    host_port = app.raw_inputs.get('host_port')
-                    container_port = app.raw_inputs.get('container_port')
-
-                    if host_port and container_port:
-                        if 'ports' not in result:
-                            result['ports'] = []
-
-                        port_dict = {
-                            "published": host_port,
-                            "target": container_port,
-                            "protocol": "tcp"
-                        }
-                        result['ports'].append(port_dict)
-                        transform_cache['port_mapping'] = True
-
-            elif transform_type == 'port_array':
-                # Handle array of port mappings
-                if isinstance(user_value, list):
-                    if 'ports' not in result:
-                        result['ports'] = []
-
-                    for port_item in user_value:
-                        if isinstance(port_item, dict) and 'host' in port_item and 'container' in port_item:
-                            # Skip empty port mappings
-                            host = port_item['host']
-                            container = port_item['container']
-
-                            # Skip if either value is empty string or None
-                            if not host or not container or host == '' or container == '':
-                                continue
-
-                            port_dict = {
-                                "published": port_item['host'],
-                                "target": port_item['container'],
-                                "protocol": port_item.get('protocol', 'tcp')
-                            }
-                            result['ports'].append(port_dict)
-
-            elif transform_type == 'volume_mapping':
-                # Handle compound field (object with source/target)
-                if isinstance(user_value, dict) and 'source' in user_value and 'target' in user_value:
-                    if 'volumes' not in result:
-                        result['volumes'] = []
-
-                    volume_dict = {
-                        "type": user_value.get('type', 'bind'),
-                        "source": user_value['source'],
-                        "target": user_value['target']
-                    }
-
-                    # Only add read_only if explicitly set to True
-                    if user_value.get('read_only'):
-                        volume_dict['read_only'] = True
-
-                    # Handle bind-specific options
-                    if volume_dict['type'] == 'bind':
-                        bind_options = {}
-                        if user_value.get('bind_propagation'):
-                            bind_options['propagation'] = user_value['bind_propagation']
-                        if 'bind_create_host_path' in user_value and user_value['bind_create_host_path'] is not None:
-                            bind_options['create_host_path'] = user_value['bind_create_host_path']
-
-                        if bind_options:
-                            volume_dict['bind'] = bind_options
-
-                    result['volumes'].append(volume_dict)
-
-                # Legacy handling: volume_target from field_schema
-                elif isinstance(user_value, str):
-                    volume_target = field_schema.get('volume_target', '/data')
-
-                    if 'volumes' not in result:
-                        result['volumes'] = []
-
-                    volume_dict = {
-                        "type": "bind",
-                        "source": user_value,
-                        "target": volume_target,
-                        "read_only": False
-                    }
-                    result['volumes'].append(volume_dict)
-
-            elif transform_type == 'volume_array':
-                # Handle array of volume mappings
-                if isinstance(user_value, list):
-                    if 'volumes' not in result:
-                        result['volumes'] = []
-
-                    for volume_item in user_value:
-                        if isinstance(volume_item, dict) and 'source' in volume_item and 'target' in volume_item:
-                            # Skip empty volume mappings
-                            source = volume_item['source']
-                            target = volume_item['target']
-
-                            # Skip if either value is empty string or None
-                            if not source or not target or source == '' or target == '':
-                                continue
-
-                            volume_type = volume_item.get('type', 'bind')
-
-                            # Apply HOST_PATH prepending for bind mounts with relative paths
-                            if volume_type == 'bind' and source.startswith('./'):
-                                source = f"${{HOST_PATH}}/{source[2:]}"
-
-                            volume_dict = {
-                                "type": volume_type,
-                                "source": source,
-                                "target": target
-                            }
-
-                            # Only add read_only if explicitly set to True
-                            if volume_item.get('read_only'):
-                                volume_dict['read_only'] = True
-
-                            # Handle bind-specific options
-                            if volume_type == 'bind':
-                                bind_options = {}
-                                if volume_item.get('bind_propagation'):
-                                    bind_options['propagation'] = volume_item['bind_propagation']
-                                if 'bind_create_host_path' in volume_item and volume_item['bind_create_host_path'] is not None:
-                                    bind_options['create_host_path'] = volume_item['bind_create_host_path']
-
-                                if bind_options:
-                                    volume_dict['bind'] = bind_options
-
-                            result['volumes'].append(volume_dict)
-
-            elif transform_type == 'network_config':
-                # Handle compound network configuration
-                if isinstance(user_value, dict):
-                    network_name = user_value.get('network_name')
-                    ipv4_address = user_value.get('ipv4_address')
-
-                    if network_name:
-                        if 'networks' not in result:
-                            result['networks'] = {}
-
-                        # Add network with optional IP configuration
-                        if ipv4_address:
-                            result['networks'][network_name] = {
-                                'ipv4_address': ipv4_address
-                            }
-                        else:
-                            # Network without specific config (use dict to allow merge)
-                            result['networks'][network_name] = {}
+            # Delegate to transform registry
+            apply_transform(
+                transform_type=transform_type,
+                user_value=user_value,
+                field_schema=field_schema,
+                app=app,
+                result=result,
+                transform_cache=transform_cache
+            )
 
         # Handle custom environment variables (schema: "service.environment.*")
         for field_name, field_schema in blueprint.schema_json.items():
@@ -449,6 +314,7 @@ class ComposeGenerator:
     def write_compose_file(self, compose: ComposeSchema, output_path: str):
         """
         Write ComposeSchema to YAML file.
+        In dry-run mode, prints to console instead of writing to file.
 
         Args:
             compose: ComposeSchema object
@@ -466,10 +332,17 @@ class ComposeGenerator:
                         f"{k}={v}" for k, v in service_config['environment'].items()
                     ]
 
-        with open(output_path, 'w') as f:
-            yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
-
-        logger.info(f"✓ Compose file written to {output_path}")
+        if self.dry_run:
+            logger.info(f"[DRY RUN] Would write compose file to {output_path}")
+            logger.info("\n" + "="*80)
+            logger.info(f"COMPOSE FILE: {output_path}")
+            logger.info("="*80)
+            print(yaml.dump(compose_dict, default_flow_style=False, sort_keys=False))
+            logger.info("="*80 + "\n")
+        else:
+            with open(output_path, 'w') as f:
+                yaml.dump(compose_dict, f, default_flow_style=False, sort_keys=False)
+            logger.info(f"✓ Compose file written to {output_path}")
 
     def _clean_empty_values(self, data):
         """
