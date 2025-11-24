@@ -321,18 +321,8 @@ class ComposeGenerator:
         """
         compose_dict = compose.model_dump(exclude_none=True)
 
-        # DEBUG: Log networks before cleaning
-        if 'services' in compose_dict:
-            for svc_name, svc_config in compose_dict['services'].items():
-                logger.info(f"🔍 BEFORE clean: {svc_name} networks = {svc_config.get('networks')}")
-
         # Remove empty strings, empty dicts, and empty lists recursively
         compose_dict = self._clean_empty_values(compose_dict)
-
-        # DEBUG: Log networks after cleaning
-        if 'services' in compose_dict:
-            for svc_name, svc_config in compose_dict['services'].items():
-                logger.info(f"🔍 AFTER clean: {svc_name} networks = {svc_config.get('networks')}")
 
         if 'services' in compose_dict:
             for service_name, service_config in compose_dict['services'].items():
