@@ -277,7 +277,7 @@
     "custom_network": {
       "type": "object",
       "label": "Custom Network",
-      "description": "Additional network for this container",
+      "description": "Additional network for this container (optional)",
       "required": false,
       "visible": true,
       "advanced": true,
@@ -285,8 +285,8 @@
         "network_name": {
           "type": "string",
           "label": "Network Name",
-          "default": "test_network",
-          "placeholder": "custom_network_name"
+          "default": "",
+          "placeholder": "my_custom_network"
         },
         "ipv4_address": {
           "type": "string",
@@ -298,16 +298,16 @@
       "schema": "service.networks",
       "compose_transform": "network_config"
     },
-    "compose_network_test": {
+    "custom_network_definition": {
       "type": "string",
       "ui_component": "text",
-      "label": "Test Network Definition (internal)",
+      "label": "Custom Network Definition (internal)",
       "default": "{\"external\": false}",
-      "description": "Defines test_network at compose level. Set external:true for existing networks, false to create new.",
+      "description": "Compose-level network definition. Set external:true for existing networks, false to create new. Only applies if custom_network.network_name is set.",
       "required": false,
       "visible": false,
       "advanced": false,
-      "schema": "compose.networks.test_network"
+      "schema": "compose.networks.{custom_network.network_name}"
     },
     "custom_environment": {
       "type": "array",
@@ -318,7 +318,8 @@
       "required": false,
       "visible": true,
       "advanced": true,
-      "schema": "service.environment.*"
+      "schema": "service.environment.*",
+      "global_suggestions": ["PUID", "PGID", "TZ", "UMASK"]
     },
     "custom_volumes": {
       "type": "array",
